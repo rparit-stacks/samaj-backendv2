@@ -2,6 +2,9 @@ package com.rps.samaj.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @ConfigurationProperties(prefix = "samaj")
 public class SamajProperties {
 
@@ -9,6 +12,7 @@ public class SamajProperties {
     private Storage storage = new Storage();
     private Bootstrap bootstrap = new Bootstrap();
     private Matrimony matrimony = new Matrimony();
+    private Cors cors = new Cors();
 
     public Jwt getJwt() {
         return jwt;
@@ -40,6 +44,14 @@ public class SamajProperties {
 
     public void setMatrimony(Matrimony matrimony) {
         this.matrimony = matrimony;
+    }
+
+    public Cors getCors() {
+        return cors;
+    }
+
+    public void setCors(Cors cors) {
+        this.cors = cors;
     }
 
     public static class Jwt {
@@ -193,6 +205,22 @@ public class SamajProperties {
             public void setPassword(String password) {
                 this.password = password;
             }
+        }
+    }
+
+    /**
+     * Extra browser origins for CORS. Use when you serve the same app on multiple hosts
+     * (e.g. {@code https://example.com} vs {@code https://www.example.com} — those are different origins).
+     */
+    public static class Cors {
+        private List<String> additionalOriginPatterns = new ArrayList<>();
+
+        public List<String> getAdditionalOriginPatterns() {
+            return additionalOriginPatterns;
+        }
+
+        public void setAdditionalOriginPatterns(List<String> additionalOriginPatterns) {
+            this.additionalOriginPatterns = additionalOriginPatterns != null ? additionalOriginPatterns : new ArrayList<>();
         }
     }
 

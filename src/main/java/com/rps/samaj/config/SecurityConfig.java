@@ -43,6 +43,7 @@ public class SecurityConfig {
                         .accessDeniedHandler(jsonAuthFailureHandlers))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/health").permitAll()
                         .requestMatchers("/auth/register", "/auth/login", "/auth/login/otp", "/auth/refresh").permitAll()
                         .requestMatchers("/auth/setup/status", "/auth/setup").permitAll()
                         .requestMatchers("/auth/otp/**").permitAll()

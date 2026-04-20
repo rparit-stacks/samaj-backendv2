@@ -36,6 +36,8 @@ public class WebConfig {
                 "https://*.vercel.app",
                 "https://www.*.vercel.app",
                 "https://frontend-flame-nine-37.vercel.app"
+                ,
+                "https://web.suryavanshisamaj.online"
         ));
         SamajProperties.Cors extra = samajProperties.getCors();
         if (extra != null && extra.getAdditionalOriginPatterns() != null) {

@@ -159,7 +159,10 @@ public class RuntimeConfigService {
         public boolean isConfigured() {
             return host != null && !host.isBlank()
                     && port > 0
-                    && fromEmail != null && !fromEmail.isBlank();
+                    && fromEmail != null && !fromEmail.isBlank()
+                    // We currently send with SMTP AUTH enabled by default. Avoid "configured" when creds are missing.
+                    && username != null && !username.isBlank()
+                    && password != null && !password.isBlank();
         }
     }
 
@@ -190,7 +193,6 @@ public class RuntimeConfigService {
 
     // ==================== STORAGE CONFIG ====================
     public StorageConfigSnapshot getStorageConfig() {
-        SamajProperties.Storage.S3 s3 = properties.getStorage().getS3();
         ResolvedS3Config rs3 = resolvedS3();
 
         String localRoot = getString(KEY_STORAGE_LOCAL_ROOT, properties.getStorage().getRoot());

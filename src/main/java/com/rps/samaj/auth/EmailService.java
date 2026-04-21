@@ -11,10 +11,15 @@ import jakarta.mail.Transport;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.Properties;
 
 @Service
 public class EmailService {
+
+    private static final Logger log = LoggerFactory.getLogger(EmailService.class);
 
     private final RuntimeConfigService runtimeConfig;
 
@@ -37,27 +42,67 @@ public class EmailService {
             var smtp = runtimeConfig.getSmtpConfig();
 
             if (!smtp.isConfigured()) {
-                logToConsole("SMTP not configured. Email to: " + to + " | Subject: " + subject);
+                String host = smtp.host() != null ? smtp.host().trim() : "";
+                String from = smtp.fromEmail() != null ? smtp.fromEmail().trim() : "";
+                String user = smtp.username() != null ? smtp.username().trim() : "";
+                boolean hasPass = smtp.password() != null && !smtp.password().isBlank();
+                log.warn(
+                        "SMTP not configured. host='{}' port={} usernameSet={} passwordSet={} fromEmailSet={} to='{}' subject='{}'",
+                        host,
+                        smtp.port(),
+                        !user.isBlank(),
+                        hasPass,
+                        !from.isBlank(),
+                        safe(to),
+                        safe(subject)
+                );
                 return true; // Return true to not block the flow
             }
 
+            String username = smtp.username() != null ? smtp.username().trim() : "";
             String password = smtp.password() != null ? smtp.password() : "";
+            boolean hasAuth = !username.isBlank() && !password.isBlank();
 
             Properties props = new Properties();
-            props.put("mail.smtp.auth", "true");
-            props.put("mail.smtp.starttls.enable", "true");
-            props.put("mail.smtp.starttls.required", "true");
             props.put("mail.smtp.host", smtp.host());
             props.put("mail.smtp.port", String.valueOf(smtp.port()));
             props.put("mail.smtp.connectiontimeout", "5000");
             props.put("mail.smtp.timeout", "5000");
+            props.put("mail.smtp.writetimeout", "5000");
 
-            Session session = Session.getInstance(props, new Authenticator() {
-                @Override
-                protected PasswordAuthentication getPasswordAuthentication() {
-                    return new PasswordAuthentication(smtp.username(), password);
-                }
-            });
+            // Heuristic TLS/SSL: 465 typically expects implicit SSL; 587 typically expects STARTTLS.
+            if (smtp.port() == 465) {
+                props.put("mail.smtp.ssl.enable", "true");
+                props.put("mail.smtp.starttls.enable", "false");
+                props.put("mail.smtp.starttls.required", "false");
+            } else {
+                props.put("mail.smtp.ssl.enable", "false");
+                props.put("mail.smtp.starttls.enable", "true");
+                props.put("mail.smtp.starttls.required", "true");
+            }
+            props.put("mail.smtp.auth", hasAuth ? "true" : "false");
+
+            log.info(
+                    "Sending email via SMTP. host='{}' port={} ssl={} starttls={} auth={} from='{}' to='{}' subject='{}' html={}",
+                    smtp.host(),
+                    smtp.port(),
+                    props.getProperty("mail.smtp.ssl.enable"),
+                    props.getProperty("mail.smtp.starttls.enable"),
+                    props.getProperty("mail.smtp.auth"),
+                    safe(smtp.fromEmail()),
+                    safe(to),
+                    safe(subject),
+                    htmlBody != null && !htmlBody.isBlank()
+            );
+
+            Session session = hasAuth
+                    ? Session.getInstance(props, new Authenticator() {
+                        @Override
+                        protected PasswordAuthentication getPasswordAuthentication() {
+                            return new PasswordAuthentication(username, password);
+                        }
+                    })
+                    : Session.getInstance(props);
 
             MimeMessage message = new MimeMessage(session);
             message.setFrom(new InternetAddress(smtp.fromEmail(), smtp.fromName()));
@@ -70,10 +115,16 @@ public class EmailService {
             }
 
             Transport.send(message);
-            logToConsole("Email sent to: " + to);
+            log.info("Email sent successfully. to='{}' subject='{}'", safe(to), safe(subject));
             return true;
         } catch (Exception e) {
-            logToConsole("Failed to send email to " + to + ": " + e.getMessage());
+            log.warn(
+                    "Failed to send email via SMTP. to='{}' subject='{}' error={} message={}",
+                    safe(to),
+                    safe(subject),
+                    e.getClass().getSimpleName(),
+                    e.getMessage()
+            );
             return false; // Don't block flow if email fails
         }
     }
@@ -159,5 +210,12 @@ public class EmailService {
 
     private void logToConsole(String message) {
         System.out.println("[EmailService] " + message);
+    }
+
+    private static String safe(String s) {
+        if (s == null) return "";
+        // Avoid log spam / accidental leakage; keep short.
+        String t = s.replaceAll("\\s+", " ").trim();
+        return t.length() > 160 ? t.substring(0, 160) + "…" : t;
     }
 }

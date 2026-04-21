@@ -87,7 +87,11 @@ public class CommunityService {
     @Transactional(readOnly = true)
     @Cacheable(
             cacheNames = RedisCacheConfig.Names.COMMUNITY_POSTS,
-            key = "T(String).valueOf(#page).concat(':').concat(T(String).valueOf(#size)).concat(':')\n+                    .concat(#tag == null ? 'all' : #tag).concat(':')\n+                    .concat(#authorId == null ? 'all' : #authorId.toString()).concat(':')\n+                    .concat(#savedOnly == null ? '0' : T(String).valueOf(#savedOnly)).concat(':')\n+                    .concat(#currentUserId == null ? 'anon' : #currentUserId.toString())"
+            key = "T(String).valueOf(#page).concat(':').concat(T(String).valueOf(#size)).concat(':')"
+                    + ".concat(#tag == null ? 'all' : #tag).concat(':')"
+                    + ".concat(#authorId == null ? 'all' : #authorId.toString()).concat(':')"
+                    + ".concat(#savedOnly == null ? '0' : T(String).valueOf(#savedOnly)).concat(':')"
+                    + ".concat(#currentUserId == null ? 'anon' : #currentUserId.toString())"
     )
     public PageResponse<CommunityPostDto> listPosts(
             int page,

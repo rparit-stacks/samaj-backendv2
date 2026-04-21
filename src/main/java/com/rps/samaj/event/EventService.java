@@ -61,7 +61,10 @@ public class EventService {
     @Transactional(readOnly = true)
     @Cacheable(
             cacheNames = RedisCacheConfig.Names.EVENTS_LIST,
-            key = "T(com.rps.samaj.security.JwtAuthenticationFilter).currentUserIdOrNull().toString().concat(':')\n+                    .concat(#organizerId == null ? 'all' : #organizerId.toString()).concat(':')\n+                    .concat(#type == null ? 'all' : #type).concat(':')\n+                    .concat(#sort == null ? 'list' : #sort)"
+            key = "(T(com.rps.samaj.security.JwtAuthenticationFilter).currentUserIdOrNull() == null ? 'anon' : T(com.rps.samaj.security.JwtAuthenticationFilter).currentUserIdOrNull().toString()).concat(':')"
+                    + ".concat(#organizerId == null ? 'all' : #organizerId.toString()).concat(':')"
+                    + ".concat(#type == null ? 'all' : #type).concat(':')"
+                    + ".concat(#sort == null ? 'list' : #sort)"
     )
     public List<EventDtos.EventItemResponse> list(UUID organizerId, String type, String sort) {
         requireUser();
@@ -99,7 +102,7 @@ public class EventService {
 
     @Transactional(readOnly = true)
     @Cacheable(cacheNames = RedisCacheConfig.Names.EVENT_DETAIL,
-            key = "T(com.rps.samaj.security.JwtAuthenticationFilter).currentUserIdOrNull().toString().concat(':').concat(T(String).valueOf(#id))")
+            key = "(T(com.rps.samaj.security.JwtAuthenticationFilter).currentUserIdOrNull() == null ? 'anon' : T(com.rps.samaj.security.JwtAuthenticationFilter).currentUserIdOrNull().toString()).concat(':').concat(T(String).valueOf(#id))")
     public EventDtos.EventDetailResponse getDetail(long id) {
         requireUser();
         UUID uid = requireUserId();
@@ -193,7 +196,7 @@ public class EventService {
 
     @Transactional(readOnly = true)
     @Cacheable(cacheNames = RedisCacheConfig.Names.EVENT_ANALYTICS,
-            key = "T(com.rps.samaj.security.JwtAuthenticationFilter).currentUserIdOrNull().toString().concat(':').concat(T(String).valueOf(#eventId))")
+            key = "(T(com.rps.samaj.security.JwtAuthenticationFilter).currentUserIdOrNull() == null ? 'anon' : T(com.rps.samaj.security.JwtAuthenticationFilter).currentUserIdOrNull().toString()).concat(':').concat(T(String).valueOf(#eventId))")
     public EventDtos.EventAnalyticsResponse analyticsForOrganizer(long eventId) {
         UUID uid = requireUserId();
         EventEntity e = eventRepository.findDetailedById(eventId)

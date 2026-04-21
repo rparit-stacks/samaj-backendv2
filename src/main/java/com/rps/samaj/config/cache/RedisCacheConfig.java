@@ -1,8 +1,9 @@
 package com.rps.samaj.config.cache;
 
+import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CachingConfigurer;
-import org.springframework.cache.interceptor.SimpleCacheErrorHandler;
+import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.cache.support.CompositeCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,9 +11,12 @@ import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.cache.RedisCacheWriter;
+import org.springframework.data.redis.cache.CacheKeyPrefix;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Map;
@@ -20,6 +24,8 @@ import java.util.AbstractMap;
 
 @Configuration
 public class RedisCacheConfig implements CachingConfigurer {
+
+    private static final Logger log = LoggerFactory.getLogger(RedisCacheConfig.class);
 
     /** Cache names (keep stable; used as Redis key prefixes). */
     public static final class Names {
@@ -82,10 +88,17 @@ public class RedisCacheConfig implements CachingConfigurer {
         var keySerializer = new StringRedisSerializer();
         var valueSerializer = RedisSerializer.json();
 
+        // IMPORTANT: Prefix keys to avoid collisions / old serialized values.
+        // Bump the version suffix any time the DTO shape / serializer changes so
+        // old cached values are effectively invalidated without flushing Redis.
+        final String keyPrefix = "samaj:v3:";
+        CacheKeyPrefix prefixFn = cacheName -> keyPrefix + cacheName + ":";
+
         RedisCacheConfiguration base = RedisCacheConfiguration.defaultCacheConfig()
                 .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(keySerializer))
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(valueSerializer))
                 .disableCachingNullValues()
+                .computePrefixWith(prefixFn)
                 .entryTtl(Duration.ofMinutes(5));
 
         Map<String, RedisCacheConfiguration> perCache = Map.ofEntries(
@@ -152,9 +165,31 @@ public class RedisCacheConfig implements CachingConfigurer {
     }
 
     @Override
-    public SimpleCacheErrorHandler errorHandler() {
-        // Never fail requests due to cache errors.
-        return new SimpleCacheErrorHandler();
+    public CacheErrorHandler errorHandler() {
+        // Never fail a request because the cache misbehaves (bad serialization,
+        // transient Redis hiccup, incompatible payload written by an older build).
+        // On any cache error we just log and let the method execute as a cache miss.
+        return new CacheErrorHandler() {
+            @Override
+            public void handleCacheGetError(RuntimeException exception, Cache cache, Object key) {
+                log.warn("Cache GET failed [{}::{}]: {}", cache.getName(), key, exception.toString());
+            }
+
+            @Override
+            public void handleCachePutError(RuntimeException exception, Cache cache, Object key, Object value) {
+                log.warn("Cache PUT failed [{}::{}]: {}", cache.getName(), key, exception.toString());
+            }
+
+            @Override
+            public void handleCacheEvictError(RuntimeException exception, Cache cache, Object key) {
+                log.warn("Cache EVICT failed [{}::{}]: {}", cache.getName(), key, exception.toString());
+            }
+
+            @Override
+            public void handleCacheClearError(RuntimeException exception, Cache cache) {
+                log.warn("Cache CLEAR failed [{}]: {}", cache.getName(), exception.toString());
+            }
+        };
     }
 }
 

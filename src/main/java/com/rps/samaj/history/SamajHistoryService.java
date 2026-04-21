@@ -58,7 +58,11 @@ public class SamajHistoryService {
     @Transactional(readOnly = true)
     @Cacheable(
             cacheNames = RedisCacheConfig.Names.HISTORY_ADMIN_LIST,
-            key = "T(String).valueOf(#page).concat(':').concat(T(String).valueOf(#size)).concat(':')\n+                    .concat(#type == null ? 'all' : #type).concat(':')\n+                    .concat(#fromDate == null ? '0' : #fromDate.toString()).concat(':')\n+                    .concat(#toDate == null ? '0' : #toDate.toString()).concat(':')\n+                    .concat(#q == null ? '' : #q)"
+            key = "T(String).valueOf(#page).concat(':').concat(T(String).valueOf(#size)).concat(':')"
+                    + ".concat(#type == null ? 'all' : #type).concat(':')"
+                    + ".concat(#fromDate == null ? '0' : #fromDate.toString()).concat(':')"
+                    + ".concat(#toDate == null ? '0' : #toDate.toString()).concat(':')"
+                    + ".concat(#q == null ? '' : #q)"
     )
     public HistoryDtos.PageResponse<HistoryDtos.HistoryResponse> adminList(
             int page,

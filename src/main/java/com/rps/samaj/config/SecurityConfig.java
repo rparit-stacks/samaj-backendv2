@@ -44,6 +44,30 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/health").permitAll()
+                        // Public CMS banners (used on login/home shells)
+                        .requestMatchers(HttpMethod.GET, "/api/banners/**").permitAll()
+                        // ----------------------------
+                        // Authenticated user endpoints
+                        // ----------------------------
+                        .requestMatchers(HttpMethod.GET, "/api/v1/emergencies").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/emergencies/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/emergencies/*/helpers").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/emergencies/helpers/*/stats").permitAll()
+                        .requestMatchers("/api/v1/emergencies/me").authenticated()
+                        .requestMatchers("/api/v1/emergencies/dashboard").authenticated()
+
+                        .requestMatchers("/api/v1/directory/me/**").authenticated()
+                        .requestMatchers("/api/v1/documents/me").authenticated()
+                        .requestMatchers("/api/v1/gallery/albums/me").authenticated()
+                        .requestMatchers("/api/v1/community/me/**").authenticated()
+
+                        .requestMatchers("/api/v1/notifications/**").authenticated()
+                        .requestMatchers("/api/v1/device-tokens/**").authenticated()
+                        .requestMatchers("/api/v1/chat/**").authenticated()
+                        .requestMatchers("/api/v1/matrimony/**").authenticated()
+                        .requestMatchers("/api/v1/exams/**").authenticated()
+                        .requestMatchers("/api/v1/suggestions/**").authenticated()
+
                         .requestMatchers("/auth/register", "/auth/login", "/auth/login/otp", "/auth/refresh").permitAll()
                         .requestMatchers("/auth/setup/status", "/auth/setup").permitAll()
                         .requestMatchers("/auth/otp/**").permitAll()
@@ -58,6 +82,28 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/matrimony/webhooks/chat").permitAll()
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers("/admin/**").hasAnyRole("ADMIN", "MODERATOR")
+                        // ----------------------------
+                        // Public read-only app content
+                        // ----------------------------
+                        .requestMatchers(HttpMethod.GET, "/api/v1/events/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/news/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/directory").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/directory/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/history/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/search/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/gallery/albums").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/gallery/albums/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/documents").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/documents/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/documents/*/file").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/community/posts").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/community/posts/*/comments").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/community/tags").permitAll()
+                        // tracking endpoints that don't require auth
+                        .requestMatchers(HttpMethod.POST, "/api/v1/community/posts/*/view").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/community/posts/*/share").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/emergencies/*/view").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/emergencies/*/contact-click").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(permissiveAuthBridgeFilter, JwtAuthenticationFilter.class)

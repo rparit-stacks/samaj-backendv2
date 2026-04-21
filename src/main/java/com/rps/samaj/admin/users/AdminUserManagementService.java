@@ -74,7 +74,10 @@ public class AdminUserManagementService {
     @Transactional(readOnly = true)
     @Cacheable(
             cacheNames = RedisCacheConfig.Names.ADMIN_USERS_LIST,
-            key = "T(String).valueOf(#page).concat(':').concat(T(String).valueOf(#size)).concat(':')\n+                    .concat(#q == null ? '' : #q).concat(':')\n+                    .concat(#roleStr == null ? 'all' : #roleStr).concat(':')\n+                    .concat(#statusStr == null ? 'all' : #statusStr)"
+            key = "T(String).valueOf(#page).concat(':').concat(T(String).valueOf(#size)).concat(':')"
+                    + ".concat(#q == null ? '' : #q).concat(':')"
+                    + ".concat(#roleStr == null ? 'all' : #roleStr).concat(':')"
+                    + ".concat(#statusStr == null ? 'all' : #statusStr)"
     )
     public AdminUserDtos.UserPageResponse list(String q, String roleStr, String statusStr, int page, int size) {
         String qq = blankToNull(q);

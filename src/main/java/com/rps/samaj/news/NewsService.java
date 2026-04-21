@@ -1,7 +1,10 @@
 package com.rps.samaj.news;
 
 import com.rps.samaj.api.dto.NewsDtos;
+import com.rps.samaj.config.cache.RedisCacheConfig;
 import com.rps.samaj.notification.PublicNotificationPublisher;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -43,6 +46,10 @@ public class NewsService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.NEWS_CATEGORIES,
+            RedisCacheConfig.Names.NEWS_ARTICLES
+    }, allEntries = true)
     public NewsDtos.NewsCategoryResponse adminCreateCategory(NewsDtos.NewsCategoryCreateRequest req) {
         String baseSlug = req.slug() != null && !req.slug().isBlank()
                 ? slugify(req.slug())
@@ -54,6 +61,10 @@ public class NewsService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.NEWS_CATEGORIES,
+            RedisCacheConfig.Names.NEWS_ARTICLES
+    }, allEntries = true)
     public NewsDtos.NewsCategoryResponse adminUpdateCategory(long id, NewsDtos.NewsCategoryUpdateRequest req) {
         NewsCategory c = categoryRepository.findById(id).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found"));
@@ -67,6 +78,10 @@ public class NewsService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.NEWS_CATEGORIES,
+            RedisCacheConfig.Names.NEWS_ARTICLES
+    }, allEntries = true)
     public void adminDeleteCategory(long id) {
         NewsCategory c = categoryRepository.findById(id).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found"));
@@ -109,6 +124,10 @@ public class NewsService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.NEWS_CATEGORIES,
+            RedisCacheConfig.Names.NEWS_ARTICLES
+    }, allEntries = true)
     public NewsDtos.NewsArticleAdminResponse adminCreateArticle(NewsDtos.NewsArticleCreateRequest req) {
         NewsCategory cat = categoryRepository.findById(req.categoryId()).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid category"));
@@ -122,6 +141,10 @@ public class NewsService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.NEWS_CATEGORIES,
+            RedisCacheConfig.Names.NEWS_ARTICLES
+    }, allEntries = true)
     public NewsDtos.NewsArticleAdminResponse adminUpdateArticle(long id, NewsDtos.NewsArticleUpdateRequest req) {
         NewsArticle a = articleRepository.findById(id).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Article not found"));
@@ -137,6 +160,10 @@ public class NewsService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.NEWS_CATEGORIES,
+            RedisCacheConfig.Names.NEWS_ARTICLES
+    }, allEntries = true)
     public void adminDeleteArticle(long id) {
         if (!articleRepository.existsById(id)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Article not found");
@@ -147,6 +174,7 @@ public class NewsService {
     // ——— User (authenticated): read-only ———
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.NEWS_CATEGORIES, key = "'v1'")
     public List<NewsDtos.NewsCategoryResponse> userListCategories() {
         return categoryRepository.findAllWithActiveArticles().stream()
                 .map(this::toCategoryResponse)
@@ -154,6 +182,7 @@ public class NewsService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.NEWS_ARTICLES, key = "T(String).valueOf(#page).concat(':').concat(T(String).valueOf(#size)).concat(':').concat(#categoryId == null ? 'all' : T(String).valueOf(#categoryId))")
     public NewsDtos.PageResponse<NewsDtos.NewsArticleResponse> userListArticles(int page, int size, Long categoryId) {
         Pageable p = PageRequest.of(Math.max(0, page), Math.min(50, Math.max(1, size)));
         Page<NewsArticle> pg = categoryId == null

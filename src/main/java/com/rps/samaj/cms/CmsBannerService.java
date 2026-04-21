@@ -1,6 +1,9 @@
 package com.rps.samaj.cms;
 
 import com.rps.samaj.api.dto.AppConfigDtos;
+import com.rps.samaj.config.cache.RedisCacheConfig;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +23,7 @@ public class CmsBannerService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.CMS_BANNERS_ALL, key = "'v1'")
     public List<AppConfigDtos.CmsMobileBannerResponse> listAll() {
         return bannerRepository.findAll().stream()
                 .map(this::toResponse)
@@ -27,6 +31,7 @@ public class CmsBannerService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.CMS_BANNERS_ACTIVE, key = "'v1'")
     public List<AppConfigDtos.CmsMobileBannerResponse> listActive() {
         return bannerRepository.findByActiveOrderByDisplayOrder(true).stream()
                 .map(this::toResponse)
@@ -34,6 +39,10 @@ public class CmsBannerService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.CMS_BANNERS_ACTIVE,
+            RedisCacheConfig.Names.CMS_BANNERS_ALL
+    }, allEntries = true)
     public AppConfigDtos.CmsMobileBannerResponse create(
             AppConfigDtos.CmsMobileBannerCreateRequest req,
             UUID createdByUserId
@@ -55,6 +64,10 @@ public class CmsBannerService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.CMS_BANNERS_ACTIVE,
+            RedisCacheConfig.Names.CMS_BANNERS_ALL
+    }, allEntries = true)
     public AppConfigDtos.CmsMobileBannerResponse update(
             UUID bannerId,
             AppConfigDtos.CmsMobileBannerUpdateRequest req,
@@ -106,6 +119,10 @@ public class CmsBannerService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.CMS_BANNERS_ACTIVE,
+            RedisCacheConfig.Names.CMS_BANNERS_ALL
+    }, allEntries = true)
     public void delete(UUID bannerId) {
         if (!bannerRepository.existsById(bannerId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Banner not found");

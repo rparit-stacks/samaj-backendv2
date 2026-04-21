@@ -4,12 +4,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rps.samaj.api.dto.EventDtos;
+import com.rps.samaj.config.cache.RedisCacheConfig;
 import com.rps.samaj.notification.PublicNotificationPublisher;
 import com.rps.samaj.security.JwtAuthenticationFilter;
 import com.rps.samaj.user.model.User;
 import com.rps.samaj.user.model.UserProfile;
 import com.rps.samaj.user.repository.UserProfileRepository;
 import com.rps.samaj.user.repository.UserRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,6 +59,10 @@ public class EventService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(
+            cacheNames = RedisCacheConfig.Names.EVENTS_LIST,
+            key = "T(com.rps.samaj.security.JwtAuthenticationFilter).currentUserIdOrNull().toString().concat(':')\n+                    .concat(#organizerId == null ? 'all' : #organizerId.toString()).concat(':')\n+                    .concat(#type == null ? 'all' : #type).concat(':')\n+                    .concat(#sort == null ? 'list' : #sort)"
+    )
     public List<EventDtos.EventItemResponse> list(UUID organizerId, String type, String sort) {
         requireUser();
         UUID currentUserId = requireUserId();
@@ -91,6 +98,8 @@ public class EventService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.EVENT_DETAIL,
+            key = "T(com.rps.samaj.security.JwtAuthenticationFilter).currentUserIdOrNull().toString().concat(':').concat(T(String).valueOf(#id))")
     public EventDtos.EventDetailResponse getDetail(long id) {
         requireUser();
         UUID uid = requireUserId();
@@ -125,6 +134,11 @@ public class EventService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.EVENTS_LIST,
+            RedisCacheConfig.Names.EVENT_DETAIL,
+            RedisCacheConfig.Names.EVENT_ANALYTICS
+    }, allEntries = true)
     public EventDtos.EventItemResponse create(EventDtos.EventCreateRequest body) {
         UUID organizerId = requireUserId();
         User organizer = userRepository.findById(organizerId)
@@ -148,6 +162,11 @@ public class EventService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.EVENTS_LIST,
+            RedisCacheConfig.Names.EVENT_DETAIL,
+            RedisCacheConfig.Names.EVENT_ANALYTICS
+    }, allEntries = true)
     public EventDtos.EventItemResponse rsvp(long eventId, EventDtos.EventRsvpRequest body) {
         UUID userId = requireUserId();
         EventEntity event = eventRepository.findById(eventId)
@@ -173,6 +192,8 @@ public class EventService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.EVENT_ANALYTICS,
+            key = "T(com.rps.samaj.security.JwtAuthenticationFilter).currentUserIdOrNull().toString().concat(':').concat(T(String).valueOf(#eventId))")
     public EventDtos.EventAnalyticsResponse analyticsForOrganizer(long eventId) {
         UUID uid = requireUserId();
         EventEntity e = eventRepository.findDetailedById(eventId)

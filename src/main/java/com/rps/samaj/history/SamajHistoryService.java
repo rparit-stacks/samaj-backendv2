@@ -1,7 +1,10 @@
 package com.rps.samaj.history;
 
 import com.rps.samaj.api.dto.HistoryDtos;
+import com.rps.samaj.config.cache.RedisCacheConfig;
 import com.rps.samaj.user.repository.UserRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -26,6 +29,12 @@ public class SamajHistoryService {
         this.userRepository = userRepository;
     }
 
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.HISTORY_ADMIN_LIST,
+            RedisCacheConfig.Names.HISTORY_ADMIN_DETAIL,
+            RedisCacheConfig.Names.HISTORY_PUBLIC_LIST,
+            RedisCacheConfig.Names.HISTORY_PUBLIC_DETAIL
+    }, allEntries = true)
     public HistoryDtos.HistoryResponse adminCreate(UUID adminUserId, HistoryDtos.HistoryCreateRequest body) {
         var admin = userRepository.findById(adminUserId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admin user not found"));
@@ -47,6 +56,10 @@ public class SamajHistoryService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(
+            cacheNames = RedisCacheConfig.Names.HISTORY_ADMIN_LIST,
+            key = "T(String).valueOf(#page).concat(':').concat(T(String).valueOf(#size)).concat(':')\n+                    .concat(#type == null ? 'all' : #type).concat(':')\n+                    .concat(#fromDate == null ? '0' : #fromDate.toString()).concat(':')\n+                    .concat(#toDate == null ? '0' : #toDate.toString()).concat(':')\n+                    .concat(#q == null ? '' : #q)"
+    )
     public HistoryDtos.PageResponse<HistoryDtos.HistoryResponse> adminList(
             int page,
             int size,
@@ -71,12 +84,19 @@ public class SamajHistoryService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.HISTORY_ADMIN_DETAIL, key = "T(String).valueOf(#id)")
     public HistoryDtos.HistoryResponse adminGet(long id) {
         SamajHistoryEntry h = samajHistoryRepository.findDetailedById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "History not found"));
         return toDto(h);
     }
 
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.HISTORY_ADMIN_LIST,
+            RedisCacheConfig.Names.HISTORY_ADMIN_DETAIL,
+            RedisCacheConfig.Names.HISTORY_PUBLIC_LIST,
+            RedisCacheConfig.Names.HISTORY_PUBLIC_DETAIL
+    }, allEntries = true)
     public HistoryDtos.HistoryResponse adminUpdate(long id, HistoryDtos.HistoryUpdateRequest body) {
         SamajHistoryEntry h = samajHistoryRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "History not found"));
@@ -93,6 +113,12 @@ public class SamajHistoryService {
         return toDto(h);
     }
 
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.HISTORY_ADMIN_LIST,
+            RedisCacheConfig.Names.HISTORY_ADMIN_DETAIL,
+            RedisCacheConfig.Names.HISTORY_PUBLIC_LIST,
+            RedisCacheConfig.Names.HISTORY_PUBLIC_DETAIL
+    }, allEntries = true)
     public void adminDelete(long id) {
         if (!samajHistoryRepository.existsById(id)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "History not found");

@@ -1,6 +1,7 @@
 package com.rps.samaj.admin.system;
 
 import com.rps.samaj.api.dto.AdminSystemDtos;
+import com.rps.samaj.config.cache.RedisCacheConfig;
 import com.rps.samaj.user.model.KycStatus;
 import com.rps.samaj.user.model.User;
 import com.rps.samaj.user.model.UserRole;
@@ -10,6 +11,8 @@ import com.rps.samaj.user.service.UserAccountProvisioner;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -91,6 +94,7 @@ public class ChildAdminManagementService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.ADMIN_SERVICE_CATALOG, key = "'v1'")
     public List<AdminSystemDtos.ServiceCatalogEntry> catalog() {
         return Arrays.stream(AdminServiceKey.values())
                 .sorted(Comparator.comparing(AdminServiceKey::name))
@@ -103,6 +107,7 @@ public class ChildAdminManagementService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.ADMIN_ME, key = "#user.id.toString()")
     public AdminSystemDtos.AdminMeResponse me(User user) {
         boolean full = adminAuthorizationService.hasFullAdminServiceAccess(user);
         List<String> keys;
@@ -126,6 +131,7 @@ public class ChildAdminManagementService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.ADMIN_CHILD_ADMINS, key = "T(String).valueOf(#page).concat(':').concat(T(String).valueOf(#size))")
     public AdminSystemDtos.ChildAdminPageResponse listChildAdmins(int page, int size) {
         int p = Math.max(page, 0);
         int s = Math.min(Math.max(size, 1), 100);
@@ -143,6 +149,7 @@ public class ChildAdminManagementService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.ADMIN_CHILD_ADMINS, key = "'detail:'.concat(#id.toString())")
     public AdminSystemDtos.ChildAdminSummaryResponse getChildAdmin(UUID id) {
         User u = userRepository.findById(id).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Child admin not found"));
@@ -152,6 +159,10 @@ public class ChildAdminManagementService {
         return toSummary(u);
     }
 
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.ADMIN_ME,
+            RedisCacheConfig.Names.ADMIN_CHILD_ADMINS
+    }, allEntries = true)
     public AdminSystemDtos.ChildAdminSummaryResponse createChildAdmin(AdminSystemDtos.ChildAdminCreateRequest body) {
         String email = body.email().trim().toLowerCase(Locale.ROOT);
         if (userRepository.findByEmailIgnoreCase(email).isPresent()) {
@@ -188,6 +199,10 @@ public class ChildAdminManagementService {
         return toSummary(userRepository.getReferenceById(user.getId()));
     }
 
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.ADMIN_ME,
+            RedisCacheConfig.Names.ADMIN_CHILD_ADMINS
+    }, allEntries = true)
     public AdminSystemDtos.ChildAdminSummaryResponse updateChildAdmin(UUID id, AdminSystemDtos.ChildAdminUpdateRequest body) {
         User user = userRepository.findById(id).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Child admin not found"));

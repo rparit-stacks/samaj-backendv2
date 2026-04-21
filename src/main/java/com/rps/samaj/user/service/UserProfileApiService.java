@@ -20,9 +20,12 @@ import com.rps.samaj.user.repository.UserSettingsRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import com.rps.samaj.config.cache.RedisCacheConfig;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -65,6 +68,7 @@ public class UserProfileApiService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.MY_PROFILE, key = "#userId.toString()")
     public UserProfileDtos.UserProfileResponse getMyProfile(UUID userId) {
         User user = loadActiveUser(userId);
         userAccountProvisioner.ensureSidecars(user);
@@ -73,6 +77,11 @@ public class UserProfileApiService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @org.springframework.cache.annotation.CacheEvict(cacheNames = RedisCacheConfig.Names.MY_PROFILE, key = "#userId.toString()"),
+            @org.springframework.cache.annotation.CacheEvict(cacheNames = RedisCacheConfig.Names.DIRECTORY_DETAIL, key = "#userId.toString()"),
+            @org.springframework.cache.annotation.CacheEvict(cacheNames = RedisCacheConfig.Names.DIRECTORY_LIST, allEntries = true)
+    })
     public UserProfileDtos.UserProfileResponse patchMyProfile(UUID userId, UserProfileDtos.UserProfilePatch patch) {
         User user = loadActiveUser(userId);
         userAccountProvisioner.ensureSidecars(user);
@@ -142,6 +151,7 @@ public class UserProfileApiService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.MY_SETTINGS, key = "#userId.toString()")
     public UserProfileDtos.UserSettingsResponse getSettings(UUID userId) {
         User user = loadActiveUser(userId);
         userAccountProvisioner.ensureSidecars(user);
@@ -150,6 +160,11 @@ public class UserProfileApiService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @org.springframework.cache.annotation.CacheEvict(cacheNames = RedisCacheConfig.Names.MY_SETTINGS, key = "#userId.toString()"),
+            @org.springframework.cache.annotation.CacheEvict(cacheNames = RedisCacheConfig.Names.DIRECTORY_DETAIL, key = "#userId.toString()"),
+            @org.springframework.cache.annotation.CacheEvict(cacheNames = RedisCacheConfig.Names.DIRECTORY_LIST, allEntries = true)
+    })
     public UserProfileDtos.UserSettingsResponse putSettings(UUID userId, UserProfileDtos.UserSettingsResponse body) {
         User user = loadActiveUser(userId);
         userAccountProvisioner.ensureSidecars(user);
@@ -162,6 +177,7 @@ public class UserProfileApiService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.MY_PRIVACY, key = "#userId.toString()")
     public UserProfileDtos.PrivacySettingsResponse getPrivacy(UUID userId) {
         User user = loadActiveUser(userId);
         userAccountProvisioner.ensureSidecars(user);
@@ -170,6 +186,7 @@ public class UserProfileApiService {
     }
 
     @Transactional
+    @org.springframework.cache.annotation.CacheEvict(cacheNames = RedisCacheConfig.Names.MY_PRIVACY, key = "#userId.toString()")
     public UserProfileDtos.PrivacySettingsResponse patchPrivacy(UUID userId, UserProfileDtos.PrivacyPatch patch) {
         User user = loadActiveUser(userId);
         userAccountProvisioner.ensureSidecars(user);

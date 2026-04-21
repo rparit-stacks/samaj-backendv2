@@ -3,10 +3,13 @@ package com.rps.samaj.achiever;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rps.samaj.api.dto.AchievementDtos;
+import com.rps.samaj.config.cache.RedisCacheConfig;
 import com.rps.samaj.user.model.User;
 import com.rps.samaj.user.model.UserProfile;
 import com.rps.samaj.user.repository.UserProfileRepository;
 import com.rps.samaj.user.repository.UserRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -54,6 +57,10 @@ public class AchievementService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.ACHIEVERS_MARQUEE,
+            RedisCacheConfig.Names.ACHIEVERS_APPROVED
+    }, allEntries = true)
     public AchievementDtos.AchievementDetailResponse create(UUID userId, AchievementDtos.AchievementCreateRequest req) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
@@ -64,6 +71,10 @@ public class AchievementService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.ACHIEVERS_MARQUEE,
+            RedisCacheConfig.Names.ACHIEVERS_APPROVED
+    }, allEntries = true)
     public AchievementDtos.AchievementDetailResponse updateOwn(UUID userId, UUID achievementId, AchievementDtos.AchievementUpdateRequest req) {
         Achievement a = achievementRepository.findById(achievementId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Achievement not found"));
@@ -81,6 +92,7 @@ public class AchievementService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.ACHIEVERS_MARQUEE, key = "'v1'")
     public List<AchievementDtos.AchievementMarqueeCard> listMarquee() {
         Instant now = Instant.now();
         List<Achievement> list = achievementRepository.findForMarquee(now, PageRequest.of(0, 50));
@@ -104,6 +116,7 @@ public class AchievementService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.ACHIEVERS_APPROVED, key = "T(String).valueOf(#page).concat(':').concat(T(String).valueOf(#size))")
     public AchievementDtos.AchievementPageResponse pageApproved(int page, int size) {
         Pageable p = PageRequest.of(Math.max(0, page), Math.min(50, Math.max(1, size)));
         Page<Achievement> pg = achievementRepository.findByStatusOrderByCreatedAtDesc(AchievementStatus.APPROVED, p);

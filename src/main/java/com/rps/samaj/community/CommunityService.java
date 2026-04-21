@@ -15,9 +15,12 @@ import com.rps.samaj.api.dto.CommunityAndFeedDtos.CommunityPostPatchRequest;
 import com.rps.samaj.api.dto.CommunityAndFeedDtos.CommunityTagWithCount;
 import com.rps.samaj.api.dto.CommunityAndFeedDtos.PageResponse;
 import com.rps.samaj.notification.PublicNotificationPublisher;
+import com.rps.samaj.config.cache.RedisCacheConfig;
 import com.rps.samaj.user.model.UserProfile;
 import com.rps.samaj.user.repository.UserProfileRepository;
 import com.rps.samaj.user.repository.UserRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -82,6 +85,10 @@ public class CommunityService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(
+            cacheNames = RedisCacheConfig.Names.COMMUNITY_POSTS,
+            key = "T(String).valueOf(#page).concat(':').concat(T(String).valueOf(#size)).concat(':')\n+                    .concat(#tag == null ? 'all' : #tag).concat(':')\n+                    .concat(#authorId == null ? 'all' : #authorId.toString()).concat(':')\n+                    .concat(#savedOnly == null ? '0' : T(String).valueOf(#savedOnly)).concat(':')\n+                    .concat(#currentUserId == null ? 'anon' : #currentUserId.toString())"
+    )
     public PageResponse<CommunityPostDto> listPosts(
             int page,
             int size,
@@ -109,6 +116,7 @@ public class CommunityService {
         return enrichPage(pg, currentUserId);
     }
 
+    @CacheEvict(cacheNames = RedisCacheConfig.Names.COMMUNITY_POSTS, allEntries = true)
     public CommunityPostDto createPost(UUID authorId, CommunityPostCreateRequest body) {
         var author = userRepository.findById(authorId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));

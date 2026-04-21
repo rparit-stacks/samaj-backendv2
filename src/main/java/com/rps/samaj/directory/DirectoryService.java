@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rps.samaj.api.dto.DirectoryDtos;
+import com.rps.samaj.config.cache.RedisCacheConfig;
 import com.rps.samaj.security.JwtAuthenticationFilter;
 import com.rps.samaj.user.model.User;
 import com.rps.samaj.user.model.UserProfile;
@@ -12,6 +13,8 @@ import com.rps.samaj.user.model.UserStatus;
 import com.rps.samaj.user.repository.UserProfileRepository;
 import com.rps.samaj.user.repository.UserRepository;
 import com.rps.samaj.user.repository.UserSettingsRepository;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -47,6 +50,7 @@ public class DirectoryService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.DIRECTORY_LIST, key = "'v1'")
     public List<DirectoryDtos.DirectoryProfileSummary> listSummaries() {
         requireUser();
         var page = profileRepository.directoryMembers(PageRequest.of(0, 500));
@@ -81,6 +85,7 @@ public class DirectoryService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.DIRECTORY_DETAIL, key = "#userId.toString()")
     public DirectoryDtos.DirectoryProfileDetail getDetail(UUID userId) {
         requireUser();
         User u = userRepository.findById(userId)
@@ -125,6 +130,10 @@ public class DirectoryService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @org.springframework.cache.annotation.CacheEvict(cacheNames = RedisCacheConfig.Names.DIRECTORY_LIST, allEntries = true),
+            @org.springframework.cache.annotation.CacheEvict(cacheNames = RedisCacheConfig.Names.DIRECTORY_DETAIL, allEntries = true)
+    })
     public DirectoryDtos.DirectorySettingsDto updateMySettings(DirectoryDtos.DirectorySettingsUpdateDto body) {
         UUID uid = requireUserId();
         User u = userRepository.findById(uid).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));

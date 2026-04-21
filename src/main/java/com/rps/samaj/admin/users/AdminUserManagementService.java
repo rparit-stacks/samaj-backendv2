@@ -1,6 +1,7 @@
 package com.rps.samaj.admin.users;
 
 import com.rps.samaj.api.dto.AdminUserDtos;
+import com.rps.samaj.config.cache.RedisCacheConfig;
 import com.rps.samaj.notification.NotificationPreference;
 import com.rps.samaj.notification.NotificationPreferenceRepository;
 import com.rps.samaj.user.model.KycStatus;
@@ -20,6 +21,8 @@ import com.rps.samaj.user.service.UserAccountProvisioner;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,7 +33,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -70,6 +72,10 @@ public class AdminUserManagementService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(
+            cacheNames = RedisCacheConfig.Names.ADMIN_USERS_LIST,
+            key = "T(String).valueOf(#page).concat(':').concat(T(String).valueOf(#size)).concat(':')\n+                    .concat(#q == null ? '' : #q).concat(':')\n+                    .concat(#roleStr == null ? 'all' : #roleStr).concat(':')\n+                    .concat(#statusStr == null ? 'all' : #statusStr)"
+    )
     public AdminUserDtos.UserPageResponse list(String q, String roleStr, String statusStr, int page, int size) {
         String qq = blankToNull(q);
         UserRole role = parseRole(roleStr);
@@ -92,6 +98,7 @@ public class AdminUserManagementService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.ADMIN_USER_DETAIL, key = "#id.toString()")
     public AdminUserDtos.UserFullDetail get(UUID id) {
         User u = userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
@@ -99,6 +106,10 @@ public class AdminUserManagementService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.ADMIN_USERS_LIST,
+            RedisCacheConfig.Names.ADMIN_USER_DETAIL
+    }, allEntries = true)
     public AdminUserDtos.UserSummary update(UUID id, AdminUserDtos.UserUpdateRequest body) {
         User u = userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
@@ -146,6 +157,10 @@ public class AdminUserManagementService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.ADMIN_USERS_LIST,
+            RedisCacheConfig.Names.ADMIN_USER_DETAIL
+    }, allEntries = true)
     public AdminUserDtos.UserCreateResponse create(AdminUserDtos.UserCreateRequest body) {
         String email = body.email() != null ? body.email().trim().toLowerCase(Locale.ROOT) : null;
         if (email == null || email.isEmpty()) {
@@ -186,6 +201,10 @@ public class AdminUserManagementService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.ADMIN_USERS_LIST,
+            RedisCacheConfig.Names.ADMIN_USER_DETAIL
+    }, allEntries = true)
     public void deleteSoft(UUID id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));

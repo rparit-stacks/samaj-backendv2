@@ -1,10 +1,13 @@
 package com.rps.samaj.gallery;
 
 import com.rps.samaj.api.dto.GalleryDtos;
+import com.rps.samaj.config.cache.RedisCacheConfig;
 import com.rps.samaj.notification.PublicNotificationPublisher;
 import com.rps.samaj.security.JwtAuthenticationFilter;
 import com.rps.samaj.user.model.User;
 import com.rps.samaj.user.repository.UserRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +36,7 @@ public class GalleryService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.GALLERY_APPROVED, key = "'v1'")
     public List<GalleryDtos.GalleryAlbumResponse> listApproved() {
         requireUser();
         return albumRepository.findApprovedWithPhotos().stream().map(this::toSummary).toList();
@@ -45,6 +49,7 @@ public class GalleryService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.GALLERY_ALBUM, key = "#id.toString()")
     public GalleryDtos.GalleryAlbumDetailResponse getAlbum(UUID id) {
         requireUser();
         GalleryAlbum a = albumRepository.findDetailedById(id)
@@ -56,6 +61,10 @@ public class GalleryService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.GALLERY_APPROVED,
+            RedisCacheConfig.Names.GALLERY_ALBUM
+    }, allEntries = true)
     public GalleryDtos.GalleryAlbumResponse create(GalleryDtos.GalleryAlbumCreateRequest body) {
         UUID uid = requireUserId();
         User user = userRepository.findById(uid)
@@ -134,6 +143,10 @@ public class GalleryService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.GALLERY_APPROVED,
+            RedisCacheConfig.Names.GALLERY_ALBUM
+    }, allEntries = true)
     public GalleryDtos.AdminGalleryAlbumResponse adminUpdate(UUID id, GalleryDtos.GalleryAlbumUpdateRequest body) {
         GalleryAlbum a = albumRepository.findDetailedById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Album not found"));

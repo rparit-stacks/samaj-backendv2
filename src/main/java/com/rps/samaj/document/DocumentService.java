@@ -1,10 +1,13 @@
 package com.rps.samaj.document;
 
 import com.rps.samaj.api.dto.DocumentDtos;
+import com.rps.samaj.config.cache.RedisCacheConfig;
 import com.rps.samaj.notification.PublicNotificationPublisher;
 import com.rps.samaj.security.JwtAuthenticationFilter;
 import com.rps.samaj.user.model.User;
 import com.rps.samaj.user.repository.UserRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +34,10 @@ public class DocumentService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(
+            cacheNames = RedisCacheConfig.Names.DOCUMENTS_PUBLISHED,
+            key = "(#category == null ? 'all' : #category).concat(':').concat(#search == null ? '' : #search)"
+    )
     public List<DocumentDtos.DocumentResponse> listPublished(String category, String search) {
         requireUser();
         String c = category == null || category.isBlank() ? null : category.trim();
@@ -45,6 +52,7 @@ public class DocumentService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.DOCUMENT_DETAIL, key = "#id.toString()")
     public DocumentDtos.DocumentResponse get(UUID id) {
         UUID viewer = requireUserId();
         AppDocument d = documentRepository.findDetailedById(id)
@@ -56,6 +64,10 @@ public class DocumentService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.DOCUMENTS_PUBLISHED,
+            RedisCacheConfig.Names.DOCUMENT_DETAIL
+    }, allEntries = true)
     public DocumentDtos.DocumentResponse create(DocumentDtos.DocumentCreateRequest body) {
         UUID uid = requireUserId();
         User user = userRepository.findById(uid)
@@ -82,6 +94,10 @@ public class DocumentService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.DOCUMENTS_PUBLISHED,
+            RedisCacheConfig.Names.DOCUMENT_DETAIL
+    }, allEntries = true)
     public DocumentDtos.DocumentResponse setApproval(UUID id, DocumentDtos.DocumentApprovalRequest body) {
         AppDocument d = documentRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
@@ -122,6 +138,10 @@ public class DocumentService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.DOCUMENTS_PUBLISHED,
+            RedisCacheConfig.Names.DOCUMENT_DETAIL
+    }, allEntries = true)
     public DocumentDtos.DocumentResponse adminUpdate(UUID id, DocumentDtos.DocumentAdminUpdateRequest body) {
         AppDocument d = documentRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));

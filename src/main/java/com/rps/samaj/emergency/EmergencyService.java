@@ -3,12 +3,15 @@ package com.rps.samaj.emergency;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rps.samaj.api.dto.EmergencyDtos;
+import com.rps.samaj.config.cache.RedisCacheConfig;
 import com.rps.samaj.notification.PublicNotificationPublisher;
 import com.rps.samaj.security.JwtAuthenticationFilter;
 import com.rps.samaj.user.model.User;
 import com.rps.samaj.user.model.UserProfile;
 import com.rps.samaj.user.repository.UserProfileRepository;
 import com.rps.samaj.user.repository.UserRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,6 +58,8 @@ public class EmergencyService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.EMERGENCY_LIST,
+            key = "'user:'.concat(#creatorFilter == null ? 'all' : #creatorFilter.toString())")
     public List<EmergencyDtos.EmergencyItemResponse> listForUser(UUID creatorFilter) {
         requireUser();
         List<EmergencyCase> rows = creatorFilter != null
@@ -64,17 +69,20 @@ public class EmergencyService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.EMERGENCY_LIST, key = "'admin:all'")
     public List<EmergencyDtos.EmergencyItemResponse> listForAdmin() {
         return toDtos(caseRepository.findAllByOrderByCreatedAtDesc());
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.EMERGENCY_LIST, key = "'mine:'.concat(#userId.toString())")
     public List<EmergencyDtos.EmergencyItemResponse> listMine(UUID userId) {
         requireUser();
         return toDtos(caseRepository.findByCreator_IdOrderByCreatedAtDesc(userId));
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisCacheConfig.Names.EMERGENCY_DETAIL, key = "T(String).valueOf(#id)")
     public EmergencyDtos.EmergencyItemResponse getById(long id) {
         requireUser();
         EmergencyCase e = caseRepository.findDetailedById(id)
@@ -83,6 +91,10 @@ public class EmergencyService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {
+            RedisCacheConfig.Names.EMERGENCY_LIST,
+            RedisCacheConfig.Names.EMERGENCY_DETAIL
+    }, allEntries = true)
     public EmergencyDtos.EmergencyItemResponse create(EmergencyDtos.EmergencyCreateRequest body) {
         UUID creatorId = requireUserId();
         User creator = userRepository.findById(creatorId)

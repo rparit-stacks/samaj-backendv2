@@ -10,6 +10,7 @@ import jakarta.mail.Session;
 import jakarta.mail.Transport;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
+
 import java.util.Properties;
 
 @Service
@@ -25,6 +26,13 @@ public class EmailService {
      * Send a simple email. Falls back gracefully if SMTP not configured.
      */
     public boolean sendEmail(String to, String subject, String body) {
+        return sendEmail(to, subject, body, null);
+    }
+
+    /**
+     * Send an email. If {@code htmlBody} is provided, sends HTML; otherwise plain text.
+     */
+    public boolean sendEmail(String to, String subject, String textBody, String htmlBody) {
         try {
             var smtp = runtimeConfig.getSmtpConfig();
 
@@ -33,7 +41,7 @@ public class EmailService {
                 return true; // Return true to not block the flow
             }
 
-            String password = runtimeConfig.getString(RuntimeConfigService.KEY_SMTP_PASSWORD, "");
+            String password = smtp.password() != null ? smtp.password() : "";
 
             Properties props = new Properties();
             props.put("mail.smtp.auth", "true");
@@ -54,8 +62,12 @@ public class EmailService {
             MimeMessage message = new MimeMessage(session);
             message.setFrom(new InternetAddress(smtp.fromEmail(), smtp.fromName()));
             message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(to));
-            message.setSubject(subject);
-            message.setText(body, "utf-8");
+            message.setSubject(subject, "utf-8");
+            if (htmlBody != null && !htmlBody.isBlank()) {
+                message.setContent(htmlBody, "text/html; charset=utf-8");
+            } else {
+                message.setText(textBody != null ? textBody : "", "utf-8");
+            }
 
             Transport.send(message);
             logToConsole("Email sent to: " + to);
@@ -70,18 +82,21 @@ public class EmailService {
      * Send OTP email with formatted template.
      */
     public boolean sendOtpEmail(String email, String otp) {
-        String subject = "Your Samaj OTP Code";
-        String body = String.format(
-            "Hello,\n\n" +
-            "Your OTP code is: %s\n\n" +
-            "This code will expire in 10 minutes.\n" +
-            "Do not share this code with anyone.\n\n" +
-            "If you didn't request this code, please ignore this email.\n\n" +
-            "Regards,\n" +
-            "Samaj Team",
-            otp
+        String siteName = runtimeConfig.getString(RuntimeConfigService.KEY_SITE_NAME, "Samaj");
+        String subject = "Your " + siteName + " OTP Code";
+        String textBody = String.format(
+                "Hello,\n\n" +
+                        "Your OTP code is: %s\n\n" +
+                        "This code will expire in 10 minutes.\n" +
+                        "Do not share this code with anyone.\n\n" +
+                        "If you didn't request this code, please ignore this email.\n\n" +
+                        "Regards,\n" +
+                        "%s Team",
+                otp,
+                siteName
         );
-        return sendEmail(email, subject, body);
+        String htmlBody = EmailTemplates.otpHtml(siteName, otp, 10);
+        return sendEmail(email, subject, textBody, htmlBody);
     }
 
     /**

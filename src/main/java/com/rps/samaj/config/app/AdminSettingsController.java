@@ -50,7 +50,7 @@ public class AdminSettingsController {
     @PutMapping("/smtp")
     public AppConfigDtos.SmtpConfigResponse updateSmtp(
             @RequestAttribute(name = DevUserContextFilter.ATTR_ADMIN_USER_ID, required = false) UUID adminId,
-            @Valid @RequestBody AppConfigDtos.SmtpConfigResponse body,
+            @Valid @RequestBody AppConfigDtos.SmtpConfigUpdateRequest body,
             HttpServletRequest request
     ) {
         requireAdmin(adminId);

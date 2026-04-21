@@ -63,7 +63,7 @@ public class AdminSettingsService {
 
     @Transactional
     public AppConfigDtos.SmtpConfigResponse updateSmtp(
-            AppConfigDtos.SmtpConfigResponse body,
+            AppConfigDtos.SmtpConfigUpdateRequest body,
             UUID adminId,
             String ipAddress
     ) {
@@ -72,6 +72,9 @@ public class AdminSettingsService {
         runtimeConfig.upsert(RuntimeConfigService.KEY_SMTP_HOST, body.host(), adminId);
         runtimeConfig.upsert(RuntimeConfigService.KEY_SMTP_PORT, String.valueOf(body.port()), adminId);
         runtimeConfig.upsert(RuntimeConfigService.KEY_SMTP_USERNAME, body.username(), adminId);
+        if (body.password() != null && !body.password().isBlank()) {
+            runtimeConfig.upsert(RuntimeConfigService.KEY_SMTP_PASSWORD, body.password(), adminId);
+        }
         runtimeConfig.upsert(RuntimeConfigService.KEY_SMTP_FROM_EMAIL, body.fromEmail(), adminId);
         runtimeConfig.upsert(RuntimeConfigService.KEY_SMTP_FROM_NAME, body.fromName(), adminId);
 

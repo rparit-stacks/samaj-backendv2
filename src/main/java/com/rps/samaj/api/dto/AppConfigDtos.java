@@ -34,6 +34,20 @@ public final class AppConfigDtos {
     ) {
     }
 
+    /**
+     * Update request for SMTP.
+     * Password is optional: when null/blank, keep the existing stored password.
+     */
+    public record SmtpConfigUpdateRequest(
+            String host,
+            int port,
+            String username,
+            String password,
+            String fromEmail,
+            String fromName
+    ) {
+    }
+
     public record MaintenanceModeResponse(
             boolean enabled,
             String message,

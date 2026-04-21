@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Firebase — service account key is a secret, never commit it ###
+src/main/resources/firebase-service-account.json

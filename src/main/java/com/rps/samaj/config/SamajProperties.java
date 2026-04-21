@@ -13,6 +13,7 @@ public class SamajProperties {
     private Bootstrap bootstrap = new Bootstrap();
     private Matrimony matrimony = new Matrimony();
     private Cors cors = new Cors();
+    private Firebase firebase = new Firebase();
 
     public Jwt getJwt() {
         return jwt;
@@ -222,6 +223,22 @@ public class SamajProperties {
         public void setAdditionalOriginPatterns(List<String> additionalOriginPatterns) {
             this.additionalOriginPatterns = additionalOriginPatterns != null ? additionalOriginPatterns : new ArrayList<>();
         }
+    }
+
+    public Firebase getFirebase() { return firebase; }
+    public void setFirebase(Firebase firebase) { this.firebase = firebase; }
+
+    /** Firebase Cloud Messaging (push notifications). */
+    public static class Firebase {
+        /** Set to true once you have placed firebase-service-account.json in resources. */
+        private boolean enabled = false;
+        /** Classpath or file-system path to the Firebase service account JSON. */
+        private String serviceAccountPath = "classpath:firebase-service-account.json";
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public String getServiceAccountPath() { return serviceAccountPath; }
+        public void setServiceAccountPath(String serviceAccountPath) { this.serviceAccountPath = serviceAccountPath; }
     }
 
     /** Optional integrations (chat webhooks, etc.). */

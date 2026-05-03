@@ -80,6 +80,14 @@ public class RedisCacheConfig implements CachingConfigurer {
         // Achievers
         public static final String ACHIEVERS_MARQUEE = "achieversMarquee";
         public static final String ACHIEVERS_APPROVED = "achieversApproved";
+
+        // Business listings
+        public static final String BUSINESS_LISTINGS = "businessListings";
+        public static final String BUSINESS_DETAIL = "businessDetail";
+
+        // Job listings
+        public static final String JOB_LISTINGS = "jobListings";
+        public static final String JOB_DETAIL = "jobDetail";
     }
 
     @Bean
@@ -149,7 +157,15 @@ public class RedisCacheConfig implements CachingConfigurer {
 
                 // Achievers
                 new AbstractMap.SimpleEntry<>(Names.ACHIEVERS_MARQUEE, base.entryTtl(Duration.ofMinutes(10))),
-                new AbstractMap.SimpleEntry<>(Names.ACHIEVERS_APPROVED, base.entryTtl(Duration.ofMinutes(5)))
+                new AbstractMap.SimpleEntry<>(Names.ACHIEVERS_APPROVED, base.entryTtl(Duration.ofMinutes(5))),
+
+                // Business listings
+                new AbstractMap.SimpleEntry<>(Names.BUSINESS_LISTINGS, base.entryTtl(Duration.ofMinutes(3))),
+                new AbstractMap.SimpleEntry<>(Names.BUSINESS_DETAIL, base.entryTtl(Duration.ofMinutes(5))),
+
+                // Job listings
+                new AbstractMap.SimpleEntry<>(Names.JOB_LISTINGS, base.entryTtl(Duration.ofMinutes(3))),
+                new AbstractMap.SimpleEntry<>(Names.JOB_DETAIL, base.entryTtl(Duration.ofMinutes(5)))
         );
 
         RedisCacheManager redis = RedisCacheManager.builder(RedisCacheWriter.nonLockingRedisCacheWriter(connectionFactory))

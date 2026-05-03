@@ -21,5 +21,8 @@ public enum AdminServiceKey {
     MATRIMONY,
     GALLERY,
     SUGGESTION,
-    ACHIEVER
+    ACHIEVER,
+    BUSINESS,
+    DONATION,
+    JOBS
 }

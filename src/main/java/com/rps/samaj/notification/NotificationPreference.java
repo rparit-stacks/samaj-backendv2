@@ -1,7 +1,9 @@
 package com.rps.samaj.notification;
 
 import com.rps.samaj.user.model.User;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
@@ -10,6 +12,8 @@ import jakarta.persistence.MapsId;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -32,6 +36,12 @@ public class NotificationPreference {
 
     @Column(name = "security_email_enabled")
     private boolean securityEmailEnabled;
+
+    /** Notification types this user has individually silenced (e.g. "COMMUNITY", "EVENT"). */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "samaj_notification_disabled_types", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "type", length = 32)
+    private Set<String> disabledTypes = new HashSet<>();
 
     protected NotificationPreference() {
     }
@@ -73,5 +83,13 @@ public class NotificationPreference {
 
     public void setSecurityEmailEnabled(boolean securityEmailEnabled) {
         this.securityEmailEnabled = securityEmailEnabled;
+    }
+
+    public Set<String> getDisabledTypes() {
+        return disabledTypes;
+    }
+
+    public void setDisabledTypes(Set<String> disabledTypes) {
+        this.disabledTypes = disabledTypes == null ? new HashSet<>() : disabledTypes;
     }
 }

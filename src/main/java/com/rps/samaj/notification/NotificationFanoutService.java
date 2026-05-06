@@ -25,20 +25,24 @@ public class NotificationFanoutService {
     private final UserRepository userRepository;
     private final NotificationPreferenceRepository preferenceRepository;
     private final NotificationBatchWriter batchWriter;
+    private final NotificationWsPushService wsPushService;
 
     public NotificationFanoutService(
             UserRepository userRepository,
             NotificationPreferenceRepository preferenceRepository,
-            NotificationBatchWriter batchWriter
+            NotificationBatchWriter batchWriter,
+            NotificationWsPushService wsPushService
     ) {
         this.userRepository = userRepository;
         this.preferenceRepository = preferenceRepository;
         this.batchWriter = batchWriter;
+        this.wsPushService = wsPushService;
     }
 
     public int fanOutSync(String title, String body, String type, String link, UUID exceptUserId) {
         String normType = normalizeType(type);
         Set<UUID> inAppDisabled = new HashSet<>(preferenceRepository.findUserIdsWithInAppDisabled());
+        Set<UUID> typeDisabled = new HashSet<>(preferenceRepository.findUserIdsWithTypeDisabled(normType));
         int total = 0;
         int page = 0;
         Page<UUID> slice;
@@ -49,7 +53,7 @@ public class NotificationFanoutService {
                 if (exceptUserId != null && exceptUserId.equals(uid)) {
                     continue;
                 }
-                if (inAppDisabled.contains(uid)) {
+                if (inAppDisabled.contains(uid) || typeDisabled.contains(uid)) {
                     continue;
                 }
                 User u = userRepository.getReferenceById(uid);
@@ -61,6 +65,7 @@ public class NotificationFanoutService {
             }
             if (!batch.isEmpty()) {
                 batchWriter.saveAllInNewTx(batch);
+                wsPushService.pushBatch(batch);
                 total += batch.size();
             }
             page++;

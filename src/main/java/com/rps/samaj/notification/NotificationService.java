@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.ZoneOffset;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -84,12 +85,13 @@ public class NotificationService {
     public NotificationDtos.NotificationPreferencesResponse getPreferences(UUID userId) {
         NotificationPreference pref = preferenceRepository.findById(userId).orElse(null);
         if (pref == null) {
-            return new NotificationDtos.NotificationPreferencesResponse(true, true, true);
+            return new NotificationDtos.NotificationPreferencesResponse(true, true, true, Set.of());
         }
         return new NotificationDtos.NotificationPreferencesResponse(
                 pref.isEmailEnabled(),
                 pref.isInAppEnabled(),
-                pref.isSecurityEmailEnabled()
+                pref.isSecurityEmailEnabled(),
+                pref.getDisabledTypes()
         );
     }
 
@@ -110,11 +112,15 @@ public class NotificationService {
         if (body.securityEmailEnabled() != null) {
             pref.setSecurityEmailEnabled(body.securityEmailEnabled());
         }
+        if (body.disabledTypes() != null) {
+            pref.setDisabledTypes(body.disabledTypes());
+        }
         preferenceRepository.save(pref);
         return new NotificationDtos.NotificationPreferencesResponse(
                 pref.isEmailEnabled(),
                 pref.isInAppEnabled(),
-                pref.isSecurityEmailEnabled()
+                pref.isSecurityEmailEnabled(),
+                pref.getDisabledTypes()
         );
     }
 

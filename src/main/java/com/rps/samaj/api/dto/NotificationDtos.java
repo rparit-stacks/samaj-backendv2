@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
+import java.util.Set;
 
 public final class NotificationDtos {
 
@@ -24,20 +25,26 @@ public final class NotificationDtos {
     ) {
     }
 
+    /** WebSocket envelope pushed to /user/queue/notifications when a new notification is saved. */
+    public record WsNotificationEvent(String event, NotificationResponse notification) {
+    }
+
     public record UnreadCountResponse(long unread) {
     }
 
     public record NotificationPreferencesResponse(
             boolean emailEnabled,
             boolean inAppEnabled,
-            boolean securityEmailEnabled
+            boolean securityEmailEnabled,
+            Set<String> disabledTypes
     ) {
     }
 
     public record NotificationPreferencesUpdateRequest(
             Boolean emailEnabled,
             Boolean inAppEnabled,
-            Boolean securityEmailEnabled
+            Boolean securityEmailEnabled,
+            Set<String> disabledTypes
     ) {
     }
 

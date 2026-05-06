@@ -2,6 +2,7 @@ package com.rps.samaj.notification;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.UUID;
@@ -10,4 +11,7 @@ public interface NotificationPreferenceRepository extends JpaRepository<Notifica
 
     @Query("select p.id from NotificationPreference p where p.inAppEnabled = false")
     List<UUID> findUserIdsWithInAppDisabled();
+
+    @Query("select p.id from NotificationPreference p join p.disabledTypes t where t = :type")
+    List<UUID> findUserIdsWithTypeDisabled(@Param("type") String type);
 }

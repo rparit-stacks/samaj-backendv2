@@ -1,21 +1,16 @@
 package com.rps.samaj.admin.system.web;
 
+import com.rps.samaj.admin.system.AdminInvitationService;
 import com.rps.samaj.admin.system.ChildAdminManagementService;
 import com.rps.samaj.api.dto.AdminSystemDtos;
 import com.rps.samaj.user.model.User;
+import com.rps.samaj.user.model.UserRole;
 import com.rps.samaj.user.repository.UserRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -27,10 +22,16 @@ public class AdminSystemController {
 
     private final UserRepository userRepository;
     private final ChildAdminManagementService childAdminManagementService;
+    private final AdminInvitationService adminInvitationService;
 
-    public AdminSystemController(UserRepository userRepository, ChildAdminManagementService childAdminManagementService) {
+    public AdminSystemController(
+            UserRepository userRepository,
+            ChildAdminManagementService childAdminManagementService,
+            AdminInvitationService adminInvitationService
+    ) {
         this.userRepository = userRepository;
         this.childAdminManagementService = childAdminManagementService;
+        this.adminInvitationService = adminInvitationService;
     }
 
     @GetMapping("/me")
@@ -44,6 +45,8 @@ public class AdminSystemController {
         requireUserId(auth);
         return childAdminManagementService.catalog();
     }
+
+    // ── Child admin CRUD (direct creation with password) ──────────────────────
 
     @GetMapping("/child-admins")
     public AdminSystemDtos.ChildAdminPageResponse listChildAdmins(
@@ -81,6 +84,39 @@ public class AdminSystemController {
         return childAdminManagementService.updateChildAdmin(id, body);
     }
 
+    // ── Invitation flow (email-based, OTP-verified) ───────────────────────────
+
+    @PostMapping("/child-admins/invite")
+    @ResponseStatus(HttpStatus.CREATED)
+    public AdminSystemDtos.InvitationResponse inviteChildAdmin(
+            Authentication auth,
+            @Valid @RequestBody AdminSystemDtos.ChildAdminInviteRequest body,
+            HttpServletRequest request
+    ) {
+        UUID userId = requireUserId(auth);
+        User user = loadUser(userId);
+        if (!user.isParentAdmin() && user.getRole() != UserRole.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the parent admin can invite sub-admins");
+        }
+        String origin = resolveOrigin(request);
+        return adminInvitationService.createInvitation(body, userId, origin);
+    }
+
+    @GetMapping("/invitations")
+    public List<AdminSystemDtos.InvitationResponse> listPendingInvitations(Authentication auth) {
+        requireUserId(auth);
+        return adminInvitationService.listPending();
+    }
+
+    @DeleteMapping("/invitations/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void cancelInvitation(Authentication auth, @PathVariable UUID id) {
+        requireUserId(auth);
+        adminInvitationService.cancelInvitation(id);
+    }
+
+    // ── internals ─────────────────────────────────────────────────────────────
+
     private User loadUser(UUID id) {
         return userRepository.findById(id).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
@@ -91,5 +127,23 @@ public class AdminSystemController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized");
         }
         return u;
+    }
+
+    private static String resolveOrigin(HttpServletRequest request) {
+        String origin = request.getHeader("Origin");
+        if (origin != null && !origin.isBlank()) return origin.trim();
+        String referer = request.getHeader("Referer");
+        if (referer != null && !referer.isBlank()) {
+            try {
+                java.net.URL url = new java.net.URL(referer);
+                int port = url.getPort();
+                return url.getProtocol() + "://" + url.getHost() + (port > 0 ? ":" + port : "");
+            } catch (Exception ignored) {
+            }
+        }
+        int port = request.getServerPort();
+        boolean defaultPort = (port == 80 && "http".equals(request.getScheme()))
+                || (port == 443 && "https".equals(request.getScheme()));
+        return request.getScheme() + "://" + request.getServerName() + (defaultPort ? "" : ":" + port);
     }
 }

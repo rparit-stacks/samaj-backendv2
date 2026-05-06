@@ -23,6 +23,7 @@ public class JwtService {
     public static final String CLAIM_TYP = "typ";
     public static final String TYP_ACCESS = "ACCESS";
     public static final String TYP_REFRESH = "REFRESH";
+    public static final String TYP_GOOGLE_SIGNUP = "GOOGLE_SIGNUP";
 
     private final SamajProperties properties;
     private final SecretKey key;
@@ -99,6 +100,41 @@ public class JwtService {
         return properties.getJwt().getAccessTtlMinutes() * 60L;
     }
 
+    public String createGoogleSignupToken(String googleId, String email, String name, String picture) {
+        Instant now = Instant.now();
+        Instant exp = now.plusSeconds(3600);
+        return Jwts.builder()
+                .subject(googleId)
+                .claim("email", email)
+                .claim("name", name != null ? name : "")
+                .claim("pic", picture != null ? picture : "")
+                .claim(CLAIM_TYP, TYP_GOOGLE_SIGNUP)
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(exp))
+                .signWith(key)
+                .compact();
+    }
+
+    public GoogleSignupClaims parseGoogleSignupToken(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+        if (!TYP_GOOGLE_SIGNUP.equals(claims.get(CLAIM_TYP, String.class))) {
+            throw new IllegalArgumentException("Not a Google signup token");
+        }
+        return new GoogleSignupClaims(
+                claims.getSubject(),
+                claims.get("email", String.class),
+                claims.get("name", String.class),
+                claims.get("pic", String.class)
+        );
+    }
+
     public record ParsedJwt(UUID userId, String typ, UserRole role, boolean adminCapable) {
+    }
+
+    public record GoogleSignupClaims(String googleId, String email, String name, String picture) {
     }
 }

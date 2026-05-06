@@ -14,6 +14,7 @@ public class SamajProperties {
     private Matrimony matrimony = new Matrimony();
     private Cors cors = new Cors();
     private Firebase firebase = new Firebase();
+    private Google google = new Google();
 
     public Jwt getJwt() {
         return jwt;
@@ -228,6 +229,9 @@ public class SamajProperties {
     public Firebase getFirebase() { return firebase; }
     public void setFirebase(Firebase firebase) { this.firebase = firebase; }
 
+    public Google getGoogle() { return google; }
+    public void setGoogle(Google google) { this.google = google; }
+
     /** Firebase Cloud Messaging (push notifications). */
     public static class Firebase {
         /** Set to true once you have placed firebase-service-account.json in resources. */
@@ -239,6 +243,18 @@ public class SamajProperties {
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
         public String getServiceAccountPath() { return serviceAccountPath; }
         public void setServiceAccountPath(String serviceAccountPath) { this.serviceAccountPath = serviceAccountPath; }
+    }
+
+    /**
+     * Google Sign-In configuration.
+     * webClientId: OAuth 2.0 Web Client ID from Google Cloud Console (used for ID token audience validation).
+     * Leave empty to skip audience validation during development.
+     */
+    public static class Google {
+        private String webClientId = "";
+
+        public String getWebClientId() { return webClientId; }
+        public void setWebClientId(String webClientId) { this.webClientId = webClientId; }
     }
 
     /** Optional integrations (chat webhooks, etc.). */

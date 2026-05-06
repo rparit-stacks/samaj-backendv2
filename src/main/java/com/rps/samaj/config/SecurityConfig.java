@@ -79,6 +79,8 @@ public class SecurityConfig {
                         .requestMatchers("/auth/register", "/auth/login", "/auth/login/otp", "/auth/refresh").permitAll()
                         .requestMatchers("/auth/setup/status", "/auth/setup").permitAll()
                         .requestMatchers("/auth/otp/**").permitAll()
+                        .requestMatchers("/auth/google/**").permitAll()
+                        .requestMatchers("/auth/admin-invite/**").permitAll()
                         .requestMatchers("/files/**").permitAll()
                         .requestMatchers("/api/v1/users/me/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/p/*/profile").permitAll()

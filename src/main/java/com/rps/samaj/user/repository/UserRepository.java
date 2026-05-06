@@ -18,6 +18,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByPhone(String phone);
 
+    Optional<User> findByGoogleId(String googleId);
+
     @Query("select u.id from User u where u.status = :status")
     Page<UUID> findIdsByStatus(@Param("status") UserStatus status, Pageable pageable);
 

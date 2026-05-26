@@ -119,8 +119,20 @@ public class AuthService {
         return buildAuthResponse(user);
     }
 
+    /**
+     * Step 1 of password login. After verifying the password, dispatch a 2FA OTP and
+     * tell the client to redirect to the OTP challenge. The client then completes the
+     * session via {@link #loginWithOtp(AuthDtos.LoginOtpRequest)}.
+     *
+     * Parent admins (bootstrap recovery accounts) bypass OTP to avoid lockout if SMTP
+     * breaks; everyone else must verify the OTP.
+     *
+     * @return a Map shaped as either
+     *   - {@code { otpRequired: true, identifier, type, message }} when an OTP was sent, OR
+     *   - {@code { otpRequired: false, ...AuthResponse fields... }} for the rare bypass path.
+     */
     @Transactional
-    public AuthDtos.AuthResponse login(AuthDtos.LoginRequest req) {
+    public Map<String, Object> login(AuthDtos.LoginRequest req) {
         User user = resolveUser(req.identifier().trim()).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
         if (user.getStatus() == UserStatus.PENDING) {
@@ -135,7 +147,33 @@ public class AuthService {
         if (user.getPasswordHash() == null || !passwordEncoder.matches(req.password(), user.getPasswordHash())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
         }
-        return buildAuthResponse(user);
+
+        // Parent admin bypass: bootstrap account must never get locked out by a broken SMTP.
+        if (user.isParentAdmin()) {
+            AuthDtos.AuthResponse direct = buildAuthResponse(user);
+            Map<String, Object> out = new HashMap<>();
+            out.put("otpRequired", false);
+            out.put("accessToken", direct.accessToken());
+            out.put("refreshToken", direct.refreshToken());
+            out.put("expiresIn", direct.expiresIn());
+            out.put("user", direct.user());
+            return out;
+        }
+
+        // Send login OTP to the user's email (canonical) and tell the client to challenge.
+        String otpIdentifier = user.getEmail() != null ? user.getEmail() : req.identifier().trim();
+        samajOtpService.generateAndStore(
+                otpIdentifier,
+                SamajOtpService.TYPE_EMAIL,
+                SamajOtpService.PURPOSE_LOGIN,
+                user.getId()
+        );
+        return Map.of(
+                "otpRequired", true,
+                "identifier", otpIdentifier,
+                "type", SamajOtpService.TYPE_EMAIL,
+                "message", "Verification code sent to your email"
+        );
     }
 
     @Transactional(readOnly = true)

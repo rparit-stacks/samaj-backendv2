@@ -1,6 +1,7 @@
 package com.rps.samaj.config.app;
 
 import com.rps.samaj.config.SamajProperties;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +41,21 @@ public class RuntimeConfigService {
 
     private final AppConfigEntryRepository repo;
     private final SamajProperties properties;
+
+    // SMTP fallback values (read from application.properties).
+    // Used only when the admin has NOT set a value in the runtime config table.
+    @Value("${spring.mail.host:}")
+    private String fallbackSmtpHost;
+    @Value("${spring.mail.port:587}")
+    private int fallbackSmtpPort;
+    @Value("${spring.mail.username:}")
+    private String fallbackSmtpUsername;
+    @Value("${spring.mail.password:}")
+    private String fallbackSmtpPassword;
+    @Value("${samaj.mail.from-email:}")
+    private String fallbackSmtpFromEmail;
+    @Value("${samaj.mail.from-name:Samaj}")
+    private String fallbackSmtpFromName;
 
     public RuntimeConfigService(AppConfigEntryRepository repo, SamajProperties properties) {
         this.repo = repo;
@@ -167,13 +183,23 @@ public class RuntimeConfigService {
     }
 
     public SmtpConfig getSmtpConfig() {
+        // DB (admin settings) wins; application.properties supplies fallback so OTP/email work out of the box.
+        String fromEmailFallback = (fallbackSmtpFromEmail != null && !fallbackSmtpFromEmail.isBlank())
+                ? fallbackSmtpFromEmail
+                : (fallbackSmtpUsername != null ? fallbackSmtpUsername : "");
+        int port;
+        try {
+            port = Integer.parseInt(getString(KEY_SMTP_PORT, String.valueOf(fallbackSmtpPort)));
+        } catch (NumberFormatException e) {
+            port = fallbackSmtpPort > 0 ? fallbackSmtpPort : 587;
+        }
         return new SmtpConfig(
-                getString(KEY_SMTP_HOST, ""),
-                Integer.parseInt(getString(KEY_SMTP_PORT, "587")),
-                getString(KEY_SMTP_USERNAME, ""),
-                getString(KEY_SMTP_PASSWORD, ""),
-                getString(KEY_SMTP_FROM_EMAIL, ""),
-                getString(KEY_SMTP_FROM_NAME, "Samaj")
+                getString(KEY_SMTP_HOST, fallbackSmtpHost != null ? fallbackSmtpHost : ""),
+                port,
+                getString(KEY_SMTP_USERNAME, fallbackSmtpUsername != null ? fallbackSmtpUsername : ""),
+                getString(KEY_SMTP_PASSWORD, fallbackSmtpPassword != null ? fallbackSmtpPassword : ""),
+                getString(KEY_SMTP_FROM_EMAIL, fromEmailFallback),
+                getString(KEY_SMTP_FROM_NAME, fallbackSmtpFromName != null ? fallbackSmtpFromName : "Samaj")
         );
     }
 

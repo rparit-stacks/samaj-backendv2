@@ -5,13 +5,20 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "samaj_users")
+@Table(
+        name = "samaj_users",
+        indexes = {
+                @Index(name = "idx_users_status", columnList = "status"),
+                @Index(name = "idx_users_role", columnList = "role")
+        }
+)
 public class User {
 
     @Id

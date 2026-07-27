@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -12,7 +13,14 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "samaj_matrimony_interests")
+@Table(
+        name = "samaj_matrimony_interests",
+        indexes = {
+                @Index(name = "idx_matrimony_interests_from", columnList = "from_profile_id"),
+                @Index(name = "idx_matrimony_interests_to", columnList = "to_profile_id"),
+                @Index(name = "idx_matrimony_interests_status", columnList = "status")
+        }
+)
 public class MatrimonyInterest {
 
     @Id

@@ -53,27 +53,20 @@ public class DirectoryService {
     @Cacheable(cacheNames = RedisCacheConfig.Names.DIRECTORY_LIST, key = "'v1'")
     public List<DirectoryDtos.DirectoryProfileSummary> listSummaries() {
         requireUser();
-        var page = profileRepository.directoryMembers(PageRequest.of(0, 500));
-        List<DirectoryDtos.DirectoryProfileSummary> out = new ArrayList<>();
-        for (UserProfile p : page.getContent()) {
-            User u = userRepository.findById(p.getId()).orElse(null);
-            if (u == null || u.getStatus() != UserStatus.ACTIVE) {
-                continue;
-            }
-            UserSettings us = settingsRepository.findById(u.getId()).orElse(null);
-            if (us != null && !us.isShowInDirectory()) {
-                continue;
-            }
-            DirectorySettings ds = directorySettingsRepository.findById(u.getId()).orElse(null);
-            if (ds != null && !ds.isVisible()) {
-                continue;
-            }
-            List<DirectoryDtos.DirectoryActionDto> actions = resolveActions(u, us, ds);
+        List<DirectoryListRow> rows = profileRepository.findDirectoryListRows(PageRequest.of(0, 500));
+        List<DirectoryDtos.DirectoryProfileSummary> out = new ArrayList<>(rows.size());
+        for (DirectoryListRow row : rows) {
+            List<DirectoryDtos.DirectoryActionDto> actions = resolveActions(
+                    row.getPhone(),
+                    row.getEmail(),
+                    Boolean.TRUE.equals(row.getShowPhone()),
+                    row.getActionsJson()
+            );
             out.add(new DirectoryDtos.DirectoryProfileSummary(
-                    u.getId().toString(),
-                    p.getFullName(),
-                    p.getAvatarUrl(),
-                    p.getCity(),
+                    row.getId().toString(),
+                    row.getFullName(),
+                    row.getAvatarUrl(),
+                    row.getCity(),
                     actions
             ));
         }
@@ -105,7 +98,12 @@ public class DirectoryService {
         }
         String phone = (us == null || us.isShowPhone()) && u.getPhone() != null ? u.getPhone() : null;
         String email = u.getEmail();
-        List<DirectoryDtos.DirectoryActionDto> actions = resolveActions(u, us, ds);
+        List<DirectoryDtos.DirectoryActionDto> actions = resolveActions(
+                u.getPhone(),
+                u.getEmail(),
+                us == null || us.isShowPhone(),
+                ds != null ? ds.getActionsJson() : null
+        );
         return new DirectoryDtos.DirectoryProfileDetail(
                 u.getId().toString(),
                 p.getFullName(),
@@ -148,19 +146,24 @@ public class DirectoryService {
         return getMySettings();
     }
 
-    private List<DirectoryDtos.DirectoryActionDto> resolveActions(User u, UserSettings us, DirectorySettings ds) {
-        List<DirectoryDtos.DirectoryActionDto> fromJson = ds != null ? parseActions(ds.getActionsJson()) : List.of();
+    private List<DirectoryDtos.DirectoryActionDto> resolveActions(
+            String phone,
+            String email,
+            boolean showPhone,
+            String actionsJson
+    ) {
+        List<DirectoryDtos.DirectoryActionDto> fromJson = parseActions(actionsJson);
         if (!fromJson.isEmpty()) {
             return fromJson.stream().sorted(Comparator.comparingInt(DirectoryDtos.DirectoryActionDto::sortOrder)).toList();
         }
         List<DirectoryDtos.DirectoryActionDto> defaults = new ArrayList<>();
         int order = 0;
-        if (us != null && us.isShowPhone() && u.getPhone() != null && !u.getPhone().isBlank()) {
-            defaults.add(new DirectoryDtos.DirectoryActionDto("CALL", "Call", u.getPhone(), order++));
-            defaults.add(new DirectoryDtos.DirectoryActionDto("WHATSAPP", "WhatsApp", u.getPhone(), order++));
+        if (showPhone && phone != null && !phone.isBlank()) {
+            defaults.add(new DirectoryDtos.DirectoryActionDto("CALL", "Call", phone, order++));
+            defaults.add(new DirectoryDtos.DirectoryActionDto("WHATSAPP", "WhatsApp", phone, order++));
         }
-        if (u.getEmail() != null && !u.getEmail().isBlank()) {
-            defaults.add(new DirectoryDtos.DirectoryActionDto("EMAIL", "Email", u.getEmail(), order++));
+        if (email != null && !email.isBlank()) {
+            defaults.add(new DirectoryDtos.DirectoryActionDto("EMAIL", "Email", email, order++));
         }
         return defaults;
     }

@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -137,7 +138,7 @@ public class MatrimonyService {
     @Transactional(readOnly = true)
     public List<MatrimonyDtos.MatrimonyProfileCard> listFavorites(UUID userId) {
         return favoriteRepository.findByUser_Id(userId).stream()
-                .map(f -> toCard(f.getProfile(), userId))
+                .map(f -> toCard(f.getProfile(), true))
                 .toList();
     }
 
@@ -227,7 +228,7 @@ public class MatrimonyService {
             params.put("cityPattern", "%" + cityVal.toLowerCase() + "%");
         }
         if (professionVal != null) {
-            String clause = "  and lower(p.detailJson) like :profPattern\n";
+            String clause = "  and lower(p.profession) like :profPattern\n";
             jpql.append(clause);
             countJpql.append(clause);
             params.put("profPattern", "%" + professionVal.toLowerCase() + "%");
@@ -267,8 +268,14 @@ public class MatrimonyService {
                 .setMaxResults(s)
                 .getResultList();
 
+        Set<UUID> favoritedIds = results.isEmpty()
+                ? Set.of()
+                : favoriteRepository.findFavoritedProfileIds(
+                        viewerId,
+                        results.stream().map(MatrimonyProfileEntity::getId).toList()
+                );
         List<MatrimonyDtos.MatrimonyProfileCard> content = results.stream()
-                .map(x -> toCard(x, viewerId))
+                .map(x -> toCard(x, favoritedIds.contains(x.getId())))
                 .toList();
         return new MatrimonyDtos.PaginatedMatrimonyProfiles(
                 content,
@@ -367,6 +374,9 @@ public class MatrimonyService {
         putDetailScalarIfPresent(body, "motherTongue", detail);
         putDetailScalarIfPresent(body, "caste", detail);
         putDetailScalarIfPresent(body, "profession", detail);
+        if (body.containsKey("profession")) {
+            p.setProfession(trimToNull(str(detail.get("profession"))));
+        }
         putDetailScalarIfPresent(body, "company", detail);
         putDetailScalarIfPresent(body, "education", detail);
         putDetailScalarIfPresent(body, "college", detail);
@@ -758,12 +768,11 @@ public class MatrimonyService {
         );
     }
 
-    private MatrimonyDtos.MatrimonyProfileCard toCard(MatrimonyProfileEntity p, UUID viewerUserId) {
+    private MatrimonyDtos.MatrimonyProfileCard toCard(MatrimonyProfileEntity p, boolean favorited) {
         Map<String, Object> detail = parseJsonMap(p.getDetailJson());
-        String profession = str(detail.get("profession"));
+        String profession = p.getProfession() != null ? p.getProfession() : str(detail.get("profession"));
         String education = str(detail.get("education"));
         List<String> photos = readStringList(p.getPhotoUrlsJson());
-        boolean fav = favoriteRepository.findByUser_IdAndProfile_Id(viewerUserId, p.getId()).isPresent();
         return new MatrimonyDtos.MatrimonyProfileCard(
                 p.getId().toString(),
                 p.getDisplayName(),
@@ -776,7 +785,7 @@ public class MatrimonyService {
                 photos.isEmpty() ? null : photos.get(0),
                 bioShort(p.getBio()),
                 p.isVerified(),
-                fav
+                favorited
         );
     }
 
@@ -813,7 +822,7 @@ public class MatrimonyService {
                 str(detail.get("religion")),
                 str(detail.get("motherTongue")),
                 str(detail.get("caste")),
-                str(detail.get("profession")),
+                p.getProfession() != null ? p.getProfession() : str(detail.get("profession")),
                 str(detail.get("company")),
                 str(detail.get("education")),
                 str(detail.get("college")),

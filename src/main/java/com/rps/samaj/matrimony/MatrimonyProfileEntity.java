@@ -5,6 +5,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -14,7 +15,16 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
-@Table(name = "samaj_matrimony_profiles")
+@Table(
+        name = "samaj_matrimony_profiles",
+        indexes = {
+                @Index(name = "idx_matrimony_profiles_search", columnList = "status, visible_in_search, gender"),
+                @Index(name = "idx_matrimony_profiles_owner", columnList = "owner_user_id"),
+                @Index(name = "idx_matrimony_profiles_city", columnList = "city"),
+                @Index(name = "idx_matrimony_profiles_dob", columnList = "date_of_birth"),
+                @Index(name = "idx_matrimony_profiles_profession", columnList = "profession")
+        }
+)
 public class MatrimonyProfileEntity {
 
     @Id
@@ -48,6 +58,10 @@ public class MatrimonyProfileEntity {
     private String city;
     private String state;
     private String country;
+
+    /** Denormalized from detail_json for searchable filters (avoids LIKE on JSON text). */
+    @Column(length = 255)
+    private String profession;
 
     @Column(columnDefinition = "text")
     private String bio;
@@ -182,6 +196,14 @@ public class MatrimonyProfileEntity {
 
     public void setCountry(String country) {
         this.country = country;
+    }
+
+    public String getProfession() {
+        return profession;
+    }
+
+    public void setProfession(String profession) {
+        this.profession = profession;
     }
 
     public String getBio() {

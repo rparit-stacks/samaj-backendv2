@@ -362,7 +362,7 @@ public class UserProfileApiService {
         );
         List<UserProfileDtos.UserProfileResponse> content = new ArrayList<>();
         for (UserProfile p : pg.getContent()) {
-            User u = userRepository.findById(p.getId()).orElse(null);
+            User u = p.getUser();
             if (u != null) {
                 content.add(toUserProfileResponse(u, p));
             }

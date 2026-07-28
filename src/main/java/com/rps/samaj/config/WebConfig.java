@@ -29,14 +29,20 @@ public class WebConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         List<String> patterns = new ArrayList<>(List.of(
+                // Local web / Vite
+                "http://localhost",
                 "http://localhost:*",
+                "http://127.0.0.1",
                 "http://127.0.0.1:*",
-                "http://192.168.1.8:*",
-                "http://192.168.137.1:*",
+                "http://192.168.*:*",
+                // Capacitor Android (androidScheme: https) + iOS
+                "https://localhost",
+                "https://localhost:*",
+                "capacitor://localhost",
+                "ionic://localhost",
                 "https://*.vercel.app",
                 "https://www.*.vercel.app",
-                "https://frontend-flame-nine-37.vercel.app"
-                ,
+                "https://frontend-flame-nine-37.vercel.app",
                 "https://web.suryavanshisamaj.online",
                 "https://api.suryavanshisamaj.online"
             ));

@@ -70,7 +70,7 @@ public class UserProfileApiService {
     @Transactional(readOnly = true)
     @Cacheable(cacheNames = RedisCacheConfig.Names.MY_PROFILE, key = "#userId.toString()")
     public UserProfileDtos.UserProfileResponse getMyProfile(UUID userId) {
-        User user = loadActiveUser(userId);
+        User user = loadUserForOwnProfile(userId);
         userAccountProvisioner.ensureSidecars(user);
         UserProfile p = userProfileRepository.findByUser_Id(userId).orElseThrow();
         return toUserProfileResponse(user, p);
@@ -242,7 +242,7 @@ public class UserProfileApiService {
 
     @Transactional(readOnly = true)
     public UserProfileDtos.PublicProfileResponse getPublicProfile(UUID targetId, UUID viewerId) {
-        User target = userRepository.findById(targetId).filter(u -> u.getStatus() == UserStatus.ACTIVE).orElseThrow(() ->
+        User target = userRepository.findById(targetId).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found"));
         userAccountProvisioner.ensureSidecars(target);
         UserProfile p = userProfileRepository.findByUser_Id(targetId).orElseThrow();
@@ -271,7 +271,8 @@ public class UserProfileApiService {
                 false,
                 flag(sp, "events", "showOnProfile", true),
                 flag(sp, "community", "showOnProfile", true),
-                flag(sp, "emergency", "showOnProfile", true)
+                flag(sp, "emergency", "showOnProfile", true),
+                target.getStatus().name()
         );
     }
 
@@ -425,7 +426,7 @@ public class UserProfileApiService {
 
     @Transactional(readOnly = true)
     public UserProfileDtos.PublicProfileResponse getPublicProfileByProfileKey(String rawKey, UUID viewerId) {
-        UserProfile p = requireActiveProfileByKey(rawKey);
+        UserProfile p = requireProfileByKey(rawKey);
         return getPublicProfile(p.getUser().getId(), viewerId);
     }
 
@@ -441,7 +442,7 @@ public class UserProfileApiService {
         return getVisibleProfile(p.getUser().getId(), context);
     }
 
-    private UserProfile requireActiveProfileByKey(String rawKey) {
+    private UserProfile requireProfileByKey(String rawKey) {
         if (rawKey == null || rawKey.isBlank()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found");
         }
@@ -449,8 +450,12 @@ public class UserProfileApiService {
         if (!key.matches("[a-z0-9._-]{1,80}")) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found");
         }
-        UserProfile p = userProfileRepository.findByProfileKeyIgnoreCase(key).orElseThrow(() ->
+        return userProfileRepository.findByProfileKeyIgnoreCase(key).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found"));
+    }
+
+    private UserProfile requireActiveProfileByKey(String rawKey) {
+        UserProfile p = requireProfileByKey(rawKey);
         if (p.getUser().getStatus() != UserStatus.ACTIVE) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found");
         }
@@ -460,6 +465,11 @@ public class UserProfileApiService {
     private User loadActiveUser(UUID userId) {
         return userRepository.findById(userId)
                 .filter(u -> u.getStatus() == UserStatus.ACTIVE)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    }
+
+    private User loadUserForOwnProfile(UUID userId) {
+        return userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     }
 
@@ -475,7 +485,8 @@ public class UserProfileApiService {
                 p.getCoverImageUrl(),
                 user.getEmail(),
                 user.getPhone(),
-                p.getBloodGroup()
+                p.getBloodGroup(),
+                user.getStatus().name()
         );
     }
 

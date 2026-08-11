@@ -20,7 +20,8 @@ public final class UserProfileDtos {
             String coverImageUrl,
             String email,
             String phone,
-            String bloodGroup
+            String bloodGroup,
+            String status
     ) {
     }
 
@@ -62,7 +63,8 @@ public final class UserProfileDtos {
             boolean privateProfile,
             boolean showEventsOnProfile,
             boolean showCommunityOnProfile,
-            boolean showEmergenciesOnProfile
+            boolean showEmergenciesOnProfile,
+            String status
     ) {
     }
 

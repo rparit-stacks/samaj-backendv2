@@ -24,10 +24,15 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
 public class DirectoryService {
+
+    private static final int MAX_ACTIONS = 10;
+    private static final Set<String> ALLOWED_ACTION_TYPES = Set.of("CALL", "WHATSAPP", "EMAIL", "LINK");
 
     private final UserProfileRepository profileRepository;
     private final UserRepository userRepository;
@@ -77,8 +82,13 @@ public class DirectoryService {
         return out;
     }
 
+    // Key includes whether this is a self-view: a hidden profile is visible to its
+    // owner but 404s for everyone else, so the two results must not share a slot.
     @Transactional(readOnly = true)
-    @Cacheable(cacheNames = RedisCacheConfig.Names.DIRECTORY_DETAIL, key = "#userId.toString()")
+    @Cacheable(
+            cacheNames = RedisCacheConfig.Names.DIRECTORY_DETAIL,
+            key = "#userId.toString() + ':' + (#userId.equals(T(com.rps.samaj.security.JwtAuthenticationFilter).currentUserIdOrNull()) ? 'self' : 'other')"
+    )
     public DirectoryDtos.DirectoryProfileDetail getDetail(UUID userId) {
         requireUser();
         User u = userRepository.findById(userId)
@@ -89,12 +99,16 @@ public class DirectoryService {
         UserProfile p = profileRepository.findByUser_Id(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found"));
         UserSettings us = settingsRepository.findById(userId).orElse(null);
-        if (us != null && !us.isShowInDirectory()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not in directory");
-        }
         DirectorySettings ds = directorySettingsRepository.findById(userId).orElse(null);
-        if (ds != null && !ds.isVisible()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not in directory");
+        // Viewing your own card must always work, even while hidden from others.
+        boolean self = userId.equals(JwtAuthenticationFilter.currentUserIdOrNull());
+        if (!self) {
+            if (us != null && !us.isShowInDirectory()) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not in directory");
+            }
+            if (ds != null && !ds.isVisible()) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not in directory");
+            }
         }
         String phone = (us == null || us.isShowPhone()) && u.getPhone() != null ? u.getPhone() : null;
         String email = u.getEmail();
@@ -122,7 +136,9 @@ public class DirectoryService {
     public DirectoryDtos.DirectorySettingsDto getMySettings() {
         UUID uid = requireUserId();
         DirectorySettings ds = directorySettingsRepository.findById(uid).orElse(null);
-        boolean visible = ds == null || ds.isVisible();
+        UserSettings us = settingsRepository.findById(uid).orElse(null);
+        // The list query requires BOTH flags, so report the effective value.
+        boolean visible = (ds == null || ds.isVisible()) && (us == null || us.isShowInDirectory());
         List<DirectoryDtos.DirectoryActionDto> actions = ds != null ? parseActions(ds.getActionsJson()) : List.of();
         return new DirectoryDtos.DirectorySettingsDto(visible, actions);
     }
@@ -137,13 +153,73 @@ public class DirectoryService {
         User u = userRepository.findById(uid).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
         DirectorySettings ds = directorySettingsRepository.findById(uid).orElseGet(() -> new DirectorySettings(u));
         ds.setVisible(body.visible());
+
+        List<DirectoryDtos.DirectoryActionDto> sanitized = sanitizeActions(body.actions());
         try {
-            ds.setActionsJson(objectMapper.writeValueAsString(body.actions() == null ? List.of() : body.actions()));
+            ds.setActionsJson(objectMapper.writeValueAsString(sanitized));
         } catch (JsonProcessingException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid actions");
         }
         directorySettingsRepository.save(ds);
-        return getMySettings();
+
+        // A user hidden from the directory must also be hidden by the global
+        // profile setting, otherwise the list query (which ANDs both flags)
+        // and this page would disagree about the user's visibility.
+        UserSettings us = settingsRepository.findById(uid).orElse(null);
+        if (us != null && us.isShowInDirectory() != body.visible()) {
+            us.setShowInDirectory(body.visible());
+            settingsRepository.save(us);
+        }
+
+        // Build the response from what was just persisted rather than calling
+        // getMySettings() — a self-invocation would bypass the Spring proxy.
+        return new DirectoryDtos.DirectorySettingsDto(ds.isVisible(), sanitized);
+    }
+
+    /**
+     * Normalises action rows coming from the client: drops blanks, forces a known
+     * type, fills in a default label and renumbers sortOrder so the stored order
+     * always matches the order the user arranged them in.
+     */
+    private static List<DirectoryDtos.DirectoryActionDto> sanitizeActions(List<DirectoryDtos.DirectoryActionDto> input) {
+        if (input == null || input.isEmpty()) {
+            return List.of();
+        }
+        List<DirectoryDtos.DirectoryActionDto> out = new ArrayList<>(input.size());
+        int order = 0;
+        for (DirectoryDtos.DirectoryActionDto a : input) {
+            if (a == null || a.value() == null || a.value().isBlank()) {
+                continue;
+            }
+            String type = normalizeActionType(a.type());
+            String label = (a.label() == null || a.label().isBlank()) ? defaultLabel(type) : a.label().trim();
+            out.add(new DirectoryDtos.DirectoryActionDto(type, trunc(label, 40), trunc(a.value().trim(), 500), order++));
+            if (order >= MAX_ACTIONS) {
+                break;
+            }
+        }
+        return out;
+    }
+
+    private static String normalizeActionType(String type) {
+        if (type == null) {
+            return "LINK";
+        }
+        String t = type.trim().toUpperCase(Locale.ROOT);
+        return ALLOWED_ACTION_TYPES.contains(t) ? t : "LINK";
+    }
+
+    private static String defaultLabel(String type) {
+        return switch (type) {
+            case "CALL" -> "Call";
+            case "WHATSAPP" -> "WhatsApp";
+            case "EMAIL" -> "Email";
+            default -> "Website";
+        };
+    }
+
+    private static String trunc(String s, int max) {
+        return s.length() <= max ? s : s.substring(0, max);
     }
 
     private List<DirectoryDtos.DirectoryActionDto> resolveActions(

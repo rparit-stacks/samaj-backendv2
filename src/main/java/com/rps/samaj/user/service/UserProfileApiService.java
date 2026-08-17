@@ -3,6 +3,7 @@ package com.rps.samaj.user.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rps.samaj.api.dto.UserProfileDtos;
+import com.rps.samaj.notification.DirectNotificationAsync;
 import com.rps.samaj.user.model.ContactRequest;
 import com.rps.samaj.user.model.ContactRequestStatus;
 import com.rps.samaj.user.model.FamilyMember;
@@ -46,6 +47,7 @@ public class UserProfileApiService {
     private final ContactRequestRepository contactRequestRepository;
     private final UserAccountProvisioner userAccountProvisioner;
     private final ObjectMapper objectMapper;
+    private final DirectNotificationAsync directNotificationAsync;
 
     public UserProfileApiService(
             UserRepository userRepository,
@@ -55,7 +57,8 @@ public class UserProfileApiService {
             FamilyMemberRepository familyMemberRepository,
             ContactRequestRepository contactRequestRepository,
             UserAccountProvisioner userAccountProvisioner,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            DirectNotificationAsync directNotificationAsync
     ) {
         this.userRepository = userRepository;
         this.userProfileRepository = userProfileRepository;
@@ -65,6 +68,7 @@ public class UserProfileApiService {
         this.contactRequestRepository = contactRequestRepository;
         this.userAccountProvisioner = userAccountProvisioner;
         this.objectMapper = objectMapper;
+        this.directNotificationAsync = directNotificationAsync;
     }
 
     @Transactional(readOnly = true)
@@ -386,8 +390,26 @@ public class UserProfileApiService {
         }
         User target = userRepository.findById(targetId).filter(u -> u.getStatus() == UserStatus.ACTIVE).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Target not found"));
+
+        // Re-sending while one is still pending would spam the target, so reuse it.
+        ContactRequest existing = contactRequestRepository
+                .findByRequester_IdAndTarget_IdAndStatus(requesterId, targetId, ContactRequestStatus.PENDING)
+                .orElse(null);
+        if (existing != null) {
+            return toContactItem(existing);
+        }
+
         ContactRequest cr = new ContactRequest(UUID.randomUUID(), requester, target, body.message());
         contactRequestRepository.save(cr);
+
+        String requesterName = displayNameOf(requester);
+        directNotificationAsync.notifyUser(
+                target.getId(),
+                "New contact request",
+                requesterName + " wants to connect with you.",
+                "CONTACT_REQUEST",
+                "/contact-requests"
+        );
         return toContactItem(cr);
     }
 
@@ -421,6 +443,18 @@ public class UserProfileApiService {
         cr.setStatus(body.approve() ? ContactRequestStatus.APPROVED : ContactRequestStatus.DENIED);
         cr.setRespondedAt(Instant.now());
         contactRequestRepository.save(cr);
+
+        // Tell the original requester what happened to their request.
+        String responderName = displayNameOf(cr.getTarget());
+        directNotificationAsync.notifyUser(
+                cr.getRequester().getId(),
+                body.approve() ? "Contact request accepted" : "Contact request declined",
+                body.approve()
+                        ? responderName + " accepted your contact request."
+                        : responderName + " declined your contact request.",
+                "CONTACT_REQUEST",
+                body.approve() ? "/user/" + cr.getTarget().getId() : "/contact-requests"
+        );
         return toContactItem(cr);
     }
 
@@ -544,6 +578,15 @@ public class UserProfileApiService {
 
     private String maskBlood(UserProfile p, UserPrivacy pr, boolean self) {
         return self || pr.isShowBloodGroup() ? p.getBloodGroup() : null;
+    }
+
+    /** Best-effort human name for notification copy, falling back to the email. */
+    private String displayNameOf(User u) {
+        UserProfile p = userProfileRepository.findByUser_Id(u.getId()).orElse(null);
+        if (p != null && p.getFullName() != null && !p.getFullName().isBlank()) {
+            return p.getFullName();
+        }
+        return u.getEmail() != null ? u.getEmail() : "A member";
     }
 
     private UserProfileDtos.ContactRequestItem toContactItem(ContactRequest cr) {

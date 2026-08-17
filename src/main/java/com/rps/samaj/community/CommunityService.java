@@ -483,6 +483,15 @@ public class CommunityService {
         return new PageResponse<>(content, pg.getTotalElements(), pg.getTotalPages(), pg.getNumber(), pg.getSize());
     }
 
+    /**
+     * Single post by id — backs shared/deep-linked post URLs. Posts carry no
+     * moderation flag, so the same rows the feed lists are readable here.
+     */
+    @Transactional(readOnly = true)
+    public CommunityPostDto getPost(long postId, UUID currentUserId) {
+        return loadPostDto(postId, currentUserId);
+    }
+
     private CommunityPostDto loadPostDto(long postId, UUID currentUserId) {
         CommunityPost p = postRepository.findDetailedById(postId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found"));

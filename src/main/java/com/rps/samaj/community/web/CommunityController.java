@@ -51,6 +51,11 @@ public class CommunityController {
         return communityService.listPosts(page, size, tag, authorId, savedOnly, uid);
     }
 
+    @GetMapping("/posts/{id}")
+    public CommunityPostDto getPost(Authentication auth, @PathVariable("id") long id) {
+        return communityService.getPost(id, principalOrNull(auth));
+    }
+
     @PostMapping("/posts")
     @ResponseStatus(HttpStatus.CREATED)
     public CommunityPostDto create(Authentication auth, @Valid @RequestBody CommunityPostCreateRequest body) {

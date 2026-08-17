@@ -61,10 +61,10 @@ public interface UserProfileRepository extends JpaRepository<UserProfile, UUID> 
                    ds.actionsJson as actionsJson
             from UserProfile p
             join p.user u
-            join UserSettings s on s.id = u.id
+            left join UserSettings s on s.id = u.id
             left join DirectorySettings ds on ds.id = u.id
             where u.status = 'ACTIVE'
-              and s.showInDirectory = true
+              and (s is null or s.showInDirectory = true)
               and (ds is null or ds.visible = true)
             order by p.fullName asc nulls last
             """)

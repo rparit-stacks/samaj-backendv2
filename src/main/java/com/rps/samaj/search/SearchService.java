@@ -3,8 +3,10 @@ package com.rps.samaj.search;
 import com.rps.samaj.api.dto.SearchDtos.SearchAllResponse;
 import com.rps.samaj.api.dto.SearchDtos.SearchCategoryResponse;
 import com.rps.samaj.api.dto.SearchDtos.SearchResultDto;
+import com.rps.samaj.api.dto.UserProfileDtos;
 import com.rps.samaj.exam.Exam;
 import com.rps.samaj.exam.ExamRepository;
+import com.rps.samaj.user.service.UserProfileApiService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -19,14 +21,17 @@ import java.util.Locale;
 public class SearchService {
 
     private final ExamRepository examRepository;
+    private final UserProfileApiService userProfileApiService;
 
-    public SearchService(ExamRepository examRepository) {
+    public SearchService(ExamRepository examRepository, UserProfileApiService userProfileApiService) {
         this.examRepository = examRepository;
+        this.userProfileApiService = userProfileApiService;
     }
 
     public SearchAllResponse searchAll(String q, int page, int size) {
         String qn = q == null ? "" : q.trim();
         List<SearchCategoryResponse> categories = new ArrayList<>();
+        categories.add(searchUsersCategory(qn, page, size));
         categories.add(searchExamsCategory(qn, page, size));
         return new SearchAllResponse(qn, categories);
     }
@@ -35,9 +40,35 @@ public class SearchService {
         String svc = serviceRaw == null ? "" : serviceRaw.trim().toUpperCase(Locale.ROOT);
         String qn = q == null ? "" : q.trim();
         return switch (svc) {
+            case "USERS" -> searchUsersCategory(qn, page, size);
             case "EXAMS" -> searchExamsCategory(qn, page, size);
             default -> emptyCategory(svc);
         };
+    }
+
+    private SearchCategoryResponse searchUsersCategory(String q, int page, int size) {
+        if (q.isBlank()) {
+            return emptyCategory("USERS");
+        }
+        int p = Math.max(page, 0);
+        int s = Math.min(Math.max(size, 1), 50);
+        UserProfileDtos.PaginatedUserProfiles pg = userProfileApiService.search(q, p, s);
+        List<SearchResultDto> results = new ArrayList<>();
+        for (UserProfileDtos.UserProfileResponse u : pg.content()) {
+            String subtitle = u.profession() != null && !u.profession().isBlank()
+                    ? u.profession()
+                    : (u.city() != null ? u.city() : "");
+            results.add(new SearchResultDto(
+                    "USERS",
+                    u.userId(),
+                    u.fullName(),
+                    subtitle,
+                    u.city(),
+                    u.avatarUrl(),
+                    "/directory/" + u.userId()
+            ));
+        }
+        return new SearchCategoryResponse("USERS", pg.totalElements(), results);
     }
 
     private SearchCategoryResponse searchExamsCategory(String q, int page, int size) {
